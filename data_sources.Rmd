@@ -1,0 +1,130 @@
+---
+title: "AgriCerradoCalibration Data Sources"
+author: "João Marcolin"
+date: "28/02/2026"
+output: html_document
+---
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE, message = FALSE, warning = FALSE, out.width='800px')
+```
+
+```{r load}
+theme_set(theme_grey())
+```
+
+# IBGE
+## PAM
+- soybean area (ha) and output (tons), 1985-2024, from [table 1612](https://sidra.ibge.gov.br/tabela/1612): `data_inputs/IBGE/PAM/tabela1612_area_XXXX_YYYY.xlsx` and `data_inputs/IBGE/PAM/tabela1612_output_XXXX_YYYY.xlsx`
+  - Variável = "Área colhida (hectares)" and "Quantidade produzida (Toneladas)"
+  - Produto das lavouras temporárias = "Soja"
+  - Ano = all values from "1985" to "2024"
+  - Unidade Territorial = "Município"
+  
+## PPM
+- herd (head of cattle), 1985-2024, from [table 3939](https://sidra.ibge.gov.br/tabela/3939): `data_inputs/IBGE/MUN/PPM/tabela3939_XXXX_YYYY.xlsx`
+  - Variável = "Efetivo do rebanho (cabeças)"
+  - Tipo de rebanho = "Bovino"
+  - Ano = all values from "1985" to "2024"
+  - Unidade Territorial = "Município"
+
+## Agriculture Census
+### 1995
+- [table 314](https://sidra.ibge.gov.br/tabela/314): farm area by activity group, `data_inputs/IBGE/agriculture_census/1995/tab314.xlsx`
+  - Variável = "Área dos estabelecimentos agropecuários (hectares)"
+  - Grupos de atividade econômica = "Total", "Lavoura temporária", "Lavoura permanente", "Pecuária", "Produção mista...", "Silvicultura e exploração florestal";
+  - Condição legal das terras = "Total"
+  - Ano = "1995"
+  - Unidade Territorial = "Município"
+- [table 321](https://sidra.ibge.gov.br/tabela/321): workers by activity group, `data_inputs/IBGE/agriculture_census/1995/tab321.xlsx`
+  - Variável = "pessoal ocupado em estabelecimentos agropecuários (Pessoas)"
+  - Grupos de atividade econômica = "Total", "Lavoura temporária", "Lavoura permanente", "Pecuária", "Produção mista...", "Silvicultura e exploração florestal";
+  - Faixas de idade = "Total"
+  - Sexo = "Total"
+  - Ano = "1995"
+  - Unidade Territorial = "Município"
+
+### 2006
+- [table 263](https://sidra.ibge.gov.br/tabela/263): farm number and farm area by area group, `data_inputs/IBGE/agriculture_census/2006/tab263_XXXX.xlsx`, where `XXXX` is `1985`, `1995`, or `2006`
+  - Variável = "Número de estabelecimentos agropecuários (unidades)" and "Área dos estabelecimentos agropecuários (hectares)"
+  - Grupos de área total = ALL
+  - Ano = "1985", "1995" and "2006"
+  - Unidade Territorial = "Unidade da Federação"
+- [table 838](https://sidra.ibge.gov.br/tabela/838): farm area by activity group, `data_inputs/IBGE/agriculture_census/2006/tab838.xlsx`
+  - Variável: "Área dos estabelecimentos agropecuários (hectares)"
+  - Grupos de atividade econômica = "Total", "Produção de lavouras temporárias", "Produção de lavouras permanentes", "Pecuária...", "Produção florestal...";
+  - Condição do produtor em relação às terras = "Total"
+  - Orientação técnica = "Total"
+  - Ano = "2006"
+  - Unidade Territorial = "Município"
+- [table 805](https://sidra.ibge.gov.br/tabela/805): workers by activity group (workers1 are related to the producer, workers2 aren't), `data_inputs/IBGE/agriculture_census/2006/tab805_X.xlsx`, where `X` is `1` or `2`
+  - Variável = "Pessoal ocupado em estabelecimentos agropecuários com laço de parentesco com o produtor (pessoas)" and "Pessoal ocupado em estabelecimentos agropecuários sem laço de parentesco com o produtor (pessoas)"
+  - Classes de dias trabalhados = ALL
+  - Condição do produtor em relação às terras = "Total"
+  - Grupos de atividade econômica = ALL
+  - Grupos de área total = "Total"
+  - Ano = "2006"
+  - Unidade Territorial = "Município"
+
+### 2017
+- [table 6880](https://sidra.ibge.gov.br/tabela/6880): farm number and farm area by area group and activity group, `data_inputs/IBGE/agriculture_census/2017/tab6880_farms_X.xlsx` and `data_inputs/IBGE/agriculture_census/2017/tab6880_area_X.xlsx`, where `X` goes from `1` to `6`
+  - Variável = "Número de estabelecimentos agropecuários (unidades)" and "Área dos estabelecimentos agropecuários (hectares)"
+  - Tipologia = "Total"
+  - Grupos de atividade econômica = "Total", "Produção de lavouras temporárias", "Produção de lavouras permanentes", "Pecuária...", "Produção florestal...";
+  - Tipo de prática agrícola = "Total"
+  - Grupos de área total = ALL
+  - Ano = "2017"
+  - Unidade Territorial = "Município"
+- [table 6888](https://sidra.ibge.gov.br/tabela/6888): workers by activity group, `data_inputs/IBGE/agriculture_census/2017/tab6888.xlsx`
+  - Variável = "Pessoal ocupado em estabelecimentos agropecuários (pessoas)"
+  - Tipologia = "Total"
+  - Tipo de pessoal ocupado = "Total"
+  - Classes de dias trabalhados = ALL
+  - Condição do produtor em relação às terras = "Total"
+  - Grupos de atividade econômica = "Total", "Produção de lavouras temporárias", "Produção de lavouras permanentes", "Pecuária...", "Produção florestal...";
+  - Ano = "2017"
+  - Unidade Territorial = "Município"
+  
+## Geographic Information
+- IBGE's [2024 shapefiles](https://www.ibge.gov.br/geociencias/organizacao-do-territorio/malhas-territoriais/15774-malhas.html): municipality and state shapefiles for 2024, `data_inputs/IBGE/spatial/BR_Municipios_2024.shp` and `data_inputs/IBGE/spatial/BR_UF_2024.shp`
+  - Under "Brasil", select "Municipos" and "Unidades da Federação"
+- IBGE's [2017 partition](www.ibge.gov.br/geociencias/cartas-e-mapas/redes-geograficas/15778-divisoes-regionais-do-brasil.html?edicao=15905&t=downloads) of Brazil into 'regiões geográficas imediatas/intermediárias': shapefiles of Brazil's RGIs and RGINTs from 2017, `data_inputs/IBGE/spatial/RG2017_rgi.shp` and `data_inputs/IBGE/spatial/RG2017_rgint.shp`
+  - downloads, divisao\_regional\_do_brasil\_em\_regioes\_geograficas\_2017, shp, "RG2017\_rgi\_20180911.zip" and "RG2017\_rgint\_20180911.zip"
+- IBGE's [biomes shapefiles](www.ibge.gov.br/geociencias/informacoes-ambientais/estudos-ambientais/15842-biomas.html): shapefiles of Brazil's biomes, `data_inputs/IBGE/spatial/IBGE_biomas_v2025_dominios_vetor_e250K.shp`
+  - vetores, vetor
+- Base dos Dados' [AMC table](https://basedosdados.org/dataset/5c9618d4-fd32-41ff-b834-61349a3bd65f?raw_data_source=02347e05-ec1b-4530-a64c-c779e85a7a7d): identifies municipalities or municipality groups that have not changed through time, `data_inputs/BdD/Brasil_AMC.csv`
+- Base dos Dados' [municipality codes table](https://basedosdados.org/dataset/33b49786-fb5f-496f-bb7c-9811c985af8e?table=dffb65ac-9df9-4151-94bf-88c45bfcb056): equivalence between municipalities' id codes in different Brazilian datasets, `data_inputs/BdD/Brasil_mun.csv`
+
+# Mapbiomas
+- Mapbiomas' [municipality-level tables](https://brasil.mapbiomas.org/en/estatisticas/) with data on Land Use and Cover variables, `data_inputs/Mapbiomas/MAPBIOMAS_COL10_MUNICIPALITY.xlsx`
+  - Land cover and use - Biome and Political Division: "BIOMES, STATES AND MUNICIPALITIES (COLEÇÃO 10.1 - COBERTURA)" - dados de área (hectares) por classe de cobertura e uso da terra para o cruzamento entre cada bioma, estado e município brasileiro para o período de 1985 a 2024
+- Mapbiomas' [LULC raster](brasil.mapbiomas.org/colecoes-mapbiomas/): raster of 30m x 30m pixels associated with LULC classes, `data_inputs/Mapbiomas/brazil_coverage_XXXX.tif`, where `XXXX` is `1985`, `1995`, `2006`, `2017` or `2024`
+  - Go to "Link para download direto" than copy and paste the link under ["Uso e Cobertura (Coleção 10 - 1985 a 2024)"](https://storage.googleapis.com/mapbiomas-public/initiatives/brasil/collection_10/lulc/coverage/brazil_coverage_2024.tif), changing the year - I use the files from 1985, 1995, 2006, 2017 and 2024
+
+# Other Geographical Information
+- CNUC's [shapefiles of conservation units](https://dados.gov.br/dados/conjuntos-dados/unidadesdeconservacao): shapefiles with all conservation units as of August 2025, `data_inputs/CNUC/cnuc_2025_08.shp`
+  - recursos, "Polígono CNUC 2025_08"
+- FUNAI's [shapefiles of indigenous territories](https://www.gov.br/funai/pt-br/atuacao/terras-indigenas/geoprocessamento-e-mapas): shapefiles with all indigenous territories, `data_inputs/FUNAI/tis_poligonaisPolygon.shp`
+  - dados geoespaciais, Terras Indígenas no Brasil (shp)
+- Imaflora's [land tenure geopackage](https://atlasagropecuario.imaflora.org/downloads): polygons with all rural properties in Imaflora's 2017 dataset, `data_inputs/Imaflora/pa_br_landtenure_imaflora_2021.gpkg`
+  - land tenure boundaries, download, full data
+- FAO GAEZ's [attainable soybean yield raster](https://gaez.fao.org/pages/data-viewer): raster of XXX m x XXX m pixels associated with a value for soybean yield (in kg per hectare), `data_inputs/FAO/ylHr_soy.tif`
+  - suitability and attainable yield
+  - Sub-Theme = "Agro-ecological Attainable Yield"
+  - Variable = "Output density"
+  - Time Period = "1981-2010"
+  - Climate Data = "CRUTS32"
+  - RCP = "Historical"
+  - Crop = "Soybean"
+  - Water Supply = "Rainfed"
+  - Input Level = "High"
+  - CO2 Fertilization = "With CO2 Fertilization"
+
+# Country-level time series
+- IPEA's [IGP-DI data](https://ipeadata.gov.br/): IGP-DI (geral - centrado - fim período) price index 1985-2024, `data_inputs/IPEA/ipeadata_IGP_DI.xlsx`
+  - macroeconômico, temas, preços, todas, Índice geral de preços - disponibilidade interna (IGP-DI) - geral - centrado - fim período: índice (ago. 1994=100)
+- IPEA's [minimum wage data](https://ipeadata.gov.br/): current minimum wage at december 1985-2026, `data_inputs/IPEA/ipeadata_salario_min.xls`
+  - macroeconômico, temas, salário e renda, todas, salário mínimo vigente
+- IPEA's [interest rate data](https://ipeadata.gov.br/): cummulative monthly base interest rate 1985-2024, `data_inputs/IPEA/ipeadata_selic_acumulada.xls`
+  - macroeconômico, temas, financeiras, todas, taxa de juros - Over/Selic - acumulada no mês
+- Paraná's Secretary of Agriculture [commodity prices data](https://www.agricultura.pr.gov.br/deral/precos): yearly data on commodity prices 1995-2023, `data_inputs/Parana/commodity_prices.xlsx`
+  - "Preços de Venda no Atacado - histórico de preços mensais desde 1995"
