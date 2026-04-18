@@ -25,7 +25,7 @@ if (!dir.exists("results"))                     dir.create("results")
 rmarkdown::render("data_sources.Rmd", output_file = "data_sources.html")
 
 # settings
-param_plot_km <- 1    # must be a positive integer
+param_plot_km <- 5    # must be a positive integer
 param_year    <- 1985 # must be 1985, 1995, 2006 or 2017
 
 # (1) agriculture census data ---------------------------------------------
