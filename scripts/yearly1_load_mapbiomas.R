@@ -1,0 +1,76 @@
+# This script loads Mapbiomas' data for land use and land cover variables
+# at the municipality level for 1985-2024
+
+# load table
+mapbiomas_df <- read_excel("data_inputs/Mapbiomas/MAPBIOMAS_COL10_MUNICIPALITY_EDITED.xlsx",
+                           col_types = c(rep("text",14),
+                                         rep("numeric",40)))
+
+# remove unnecessary columns
+mapbiomas_df <- mapbiomas_df %>%
+  dplyr::select(code_mun=geocode,
+                class,
+                `1985`:`2024`)
+
+# simplify land cover categories
+dict <- c("0"  = "mb_notobs_ha",
+          "3"  = "mb_natcover_ha",
+          "4"  = "mb_natcover_ha",
+          "5"  = "mb_natcover_ha",
+          "6"  = "mb_natcover_ha",
+          "11" = "mb_natcover_ha",
+          "12" = "mb_natcover_ha",
+          "29" = "mb_natcover_ha",
+          "32" = "mb_natcover_ha",
+          "49" = "mb_natcover_ha",
+          "50" = "mb_natcover_ha",
+          "15" = "mb_pasture_ha",
+          "21" = "mb_pasture_ha",
+          "20" = "mb_tcrop_ha",
+          "39" = "mb_soybean_ha",
+          "40" = "mb_tcrop_ha",
+          "41" = "mb_tcrop_ha",
+          "62" = "mb_tcrop_ha",
+          "35" = "mb_pcrop_ha",
+          "46" = "mb_pcrop_ha",
+          "47" = "mb_pcrop_ha",
+          "48" = "mb_pcrop_ha",
+          "9"  = "mb_forestry_ha",
+          "13" = "mb_nonveg_ha",
+          "23" = "mb_nonveg_ha",
+          "24" = "mb_nonveg_ha",
+          "25" = "mb_nonveg_ha",
+          "30" = "mb_nonveg_ha",
+          "31" = "mb_nonveg_ha",
+          "33" = "mb_nonveg_ha",
+          "75" = "mb_notobs_ha")
+
+## check if there are classes in mapbiomas_df that are not in dict
+#unknown <- setdiff(unique(mapbiomas_df$class), names(dict))
+#if (length(unknown) > 0) warning("Unmapped MapBiomas class codes: ", paste(unknown, collapse=", "))
+
+mapbiomas_df$class <- dict[mapbiomas_df$class]
+rm(dict)
+
+# summarize
+mapbiomas_df <- mapbiomas_df %>%
+  dplyr::group_by(code_mun, class) %>%
+  dplyr::summarise(across(where(is.numeric), \(x) sum(x,na.rm=TRUE))) %>%
+  dplyr::ungroup()
+
+# mapbiomas_df has "Lagoa dos Patos" (4300002) and "Lagoa Mirim" (4300001), which are not municipalities
+mapbiomas_df  <- mapbiomas_df  %>%
+  dplyr::filter(!(code_mun %in% c("4300002","4300001")))
+
+# pivot table
+mapbiomas_df <- mapbiomas_df %>%
+  tidyr::pivot_longer(
+    cols      = `1985`:`2024`,
+    names_to  = "year",
+    values_to = "area"
+  ) %>%
+  tidyr::pivot_wider(
+    names_from  = class,
+    values_from = area
+  )
+  

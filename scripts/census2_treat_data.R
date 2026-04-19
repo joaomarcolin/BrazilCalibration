@@ -16,9 +16,6 @@
 # worker*_2006
 # worker_2017
 
-rm(list=ls())
-source("scripts/census1_load_data.R")
-
 # (1) recode state names --------------------------------------------------
 dict_state <- c("Acre"              ="AC", "Alagoas"             ="AL",
                 "Amapá"             ="AP", "Amazonas"            ="AM",

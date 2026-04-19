@@ -39,14 +39,17 @@ readr::write_csv(census_mun,   "data_outputs/1_census_data/IBGE_agricensus_munic
 readr::write_csv(census_state, "data_outputs/1_census_data/IBGE_agricensus_states.csv")
 
 # (2) yearly municipality-level data --------------------------------------
-source("scripts/yearly1_load_mapbiomas.R")    # load Mapbiomas data
-source("scripts/yearly2_load_PAM_PPM_PEVS.R") # load PAM and PPM data
-source("scripts/yearly3_sort_amc.R")          # sort municipalities by AMC
-source("scripts/yearly4_calculate_yield.R")   # calculate yield
-source("scripts/yearly5_price_series.R")      # get yearly country-level variables
+source("scripts/yearly1_load_mapbiomas.R") # load Mapbiomas data
+source("scripts/yearly2_load_PAM_PPM.R")   # load PAM and PPM data and create 'yearly_mun' table with yearly municipality-level data
+source("scripts/yearly3_price_data.R")     # get yearly country-level variables
+
+#source("scripts/yearly3_sort_amc.R")          # sort municipalities by AMC
+#source("scripts/yearly4_calculate_yield.R")   # calculate yield
+#source("scripts/yearly5_price_series.R")      # get yearly country-level variables
+
 # save final data for calibration
-readr::write_csv(MUN_data,      "data_outputs/2_yearly_data/municipality_data.csv")
-readr::write_csv(yearly_prices, "data_outputs/2_yearly_data/prices.csv")
+readr::write_csv(yearly_mun,    "data_outputs/2_yearly_data/municipality_data.csv")
+readr::write_csv(yearly_prices, "data_outputs/2_yearly_data/prices_data.csv")
 
 # (3) geographical analysis -----------------------------------------------
 
