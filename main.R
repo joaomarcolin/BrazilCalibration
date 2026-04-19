@@ -31,14 +31,12 @@ param_year    <- 1985 # must be 1985, 1995, 2006 or 2017
 # (1) agriculture census data ---------------------------------------------
 source("scripts/census1_load_data.R")      # load agriculture census data
 source("scripts/census2_treat_data.R")     # tidy agriculture census data
-source("scripts/census3_get_parameters.R") # calculate model parameters
+
+#source("scripts/census3_get_parameters.R") # calculate model parameters
+
 # saves outputs
-readr::write_csv(farm_area_by_class,        "data_outputs/1_census_data/farm_area_by_class.csv")
-readr::write_csv(farm_area_by_class_2017,   "data_outputs/1_census_data/farm_area_by_class_2017.csv")
-readr::write_csv(farm_number_by_class,      "data_outputs/1_census_data/farm_number_by_class.csv")
-readr::write_csv(farm_number_by_class_2017, "data_outputs/1_census_data/farm_number_by_class_2017.csv")
-readr::write_csv(workers_per_ha,            "data_outputs/1_census_data/workers_per_ha.csv")
-readr::write_csv(area_by_activity,          "data_outputs/1_census_data/area_by_activity.csv")
+readr::write_csv(census_mun,   "data_outputs/1_census_data/IBGE_agricensus_municipalities.csv")
+readr::write_csv(census_state, "data_outputs/1_census_data/IBGE_agricensus_states.csv")
 
 # (2) yearly municipality-level data --------------------------------------
 source("scripts/yearly1_load_mapbiomas.R")    # load Mapbiomas data

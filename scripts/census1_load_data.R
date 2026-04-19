@@ -6,18 +6,16 @@
 # 1995
 area_activity_1995   <- readxl::read_excel("data_inputs/IBGE/agriculture_census/1995/tabela314_EDITED.xlsx", col_types="text")
 worker_1995          <- readxl::read_excel("data_inputs/IBGE/agriculture_census/1995/tabela321_EDITED.xlsx", col_types="text")
-
 # 2006
 area_1985            <- readxl::read_excel("data_inputs/IBGE/agriculture_census/2006/tabela263_1985_area_EDITED.xlsx", col_types="text")
-area_1995            <- readxl::read_excel("data_inputs/IBGE/agriculture_census/2006/tabela263_1995_area_EDITED.xlsx", col_types="text")
-area_2006            <- readxl::read_excel("data_inputs/IBGE/agriculture_census/2006/tabela263_2006_area_EDITED.xlsx", col_types="text")
 farm_1985            <- readxl::read_excel("data_inputs/IBGE/agriculture_census/2006/tabela263_1985_farm_EDITED.xlsx", col_types="text")
+area_1995            <- readxl::read_excel("data_inputs/IBGE/agriculture_census/2006/tabela263_1995_area_EDITED.xlsx", col_types="text")
 farm_1995            <- readxl::read_excel("data_inputs/IBGE/agriculture_census/2006/tabela263_1995_farm_EDITED.xlsx", col_types="text")
+area_2006            <- readxl::read_excel("data_inputs/IBGE/agriculture_census/2006/tabela263_2006_area_EDITED.xlsx", col_types="text")
 farm_2006            <- readxl::read_excel("data_inputs/IBGE/agriculture_census/2006/tabela263_2006_farm_EDITED.xlsx", col_types="text")
 worker1_2006         <- readxl::read_excel("data_inputs/IBGE/agriculture_census/2006/tabela805_1_EDITED.xlsx", col_types="text") %>% tidyr::fill(`Cód.`, `Município`, .direction="down")
 worker2_2006         <- readxl::read_excel("data_inputs/IBGE/agriculture_census/2006/tabela805_2_EDITED.xlsx", col_types="text") %>% tidyr::fill(`Cód.`, `Município`, .direction="down")
 area_activity_2006   <- readxl::read_excel("data_inputs/IBGE/agriculture_census/2006/tabela838_EDITED.xlsx", col_types="text")
-
 ## 2017
 area_2017          <- readxl::read_excel("data_inputs/IBGE/agriculture_census/2017/tabela6880_area_EDITED.xlsx", col_types="text")     %>% tidyr::fill(`Cód.`, `Município`, .direction="down")
 farm_2017          <- readxl::read_excel("data_inputs/IBGE/agriculture_census/2017/tabela6880_farm_EDITED.xlsx", col_types="text")     %>% tidyr::fill(`Cód.`, `Município`, .direction="down")
@@ -29,36 +27,49 @@ worker_2017        <- readxl::read_excel("data_inputs/IBGE/agriculture_census/20
 pivot_rename <- function(df, df_level, df_activity=FALSE) {
   if (df_level=="mun") {
     # if the table has column "Grupo de de atividade econômica", don't pivot it
-    keep <- if (df_activity) {c("Cód.", "Município", "Grupos de atividade econômica")} else {c("Cód.", "Município")}
+    keep <- if (df_activity) {
+              c("Cód.", "Município", "Grupos de atividade econômica")
+            } else {
+              c("Cód.", "Município")
+            }
     # if the table has municipality-level data, keep and rename municipality identifiers
     df <- df %>%
       tidyr::pivot_longer(cols=-all_of(keep),
                           names_to="class",
                           values_to="value") %>%
-      dplyr::rename(code_mun=`Cód.`, name_mun=`Município`)
+      dplyr::rename(code_mun=`Cód.`,
+                    name_mun=`Município`)
     # if the table has column "Grupo de de atividade econômica", rename it
     if (df_activity) {
-      df <- df %>% dplyr::rename(activity=`Grupos de atividade econômica`)
+      df <- df %>% 
+        dplyr::rename(activity=`Grupos de atividade econômica`)
     }
     # return data frame
     return(df)
   } else if (df_level=="state") {
     # same as above, but for state-level tables
-    keep <- if (df_activity) {c("Unidade da Federação","Grupos de atividade econômica")} else {"Unidade da Federação"}
+    keep <- if (df_activity) {
+              c("Unidade da Federação","Grupos de atividade econômica")
+            } else {
+              "Unidade da Federação"
+            }
+    
     df <- df %>%
       tidyr::pivot_longer(cols=-all_of(keep),
                           names_to="class",
                           values_to="value") %>%
       dplyr::rename(state=`Unidade da Federação`)
     if (df_activity) {
-      df <- df %>% dplyr::rename(activity=`Grupos de atividade econômica`)
+      df <- df %>%
+        dplyr::rename(activity=`Grupos de atividade econômica`)
     }
+    
     return(df)
   } else {
     warning("df_level must be either 'mun' or 'state'.")
     return()
   }
-}
+} # closes pivot_rename(df, df_level, df_activity)
 
 # 1985
 area_activity_1995 <- pivot_rename(area_activity_1995, "mun", FALSE)
@@ -76,10 +87,17 @@ worker2_2006       <- pivot_rename(worker2_2006,       "mun",   TRUE)
 area_activity_2006 <- pivot_rename(area_activity_2006, "mun",   FALSE)
 
 # 2017
-area_2017          <- dplyr::rename(area_2017, code_mun=`Cód.`, name_mun=`Município`, class=`Grupos de área total`, value=Total)
-farm_2017          <- dplyr::rename(farm_2017, code_mun=`Cód.`, name_mun=`Município`, class=`Grupos de área total`, value=Total)
 area_activity_2017 <- pivot_rename(area_activity_2017, "mun", FALSE)
 worker_2017        <- pivot_rename(worker_2017,        "mun", TRUE)
+# no need to pivot the two tables below
+area_2017          <- area_2017 %>% dplyr::rename(code_mun=`Cód.`,
+                                                  name_mun=`Município`,
+                                                  class=`Grupos de área total`,
+                                                  value=Total)
+farm_2017          <- farm_2017 %>% dplyr::rename(code_mun=`Cód.`,
+                                                  name_mun=`Município`,
+                                                  class=`Grupos de área total`,
+                                                  value=Total)
 rm(pivot_rename)
 
 # (2) substitute weird values and group tables ----------------------------
@@ -89,14 +107,12 @@ rm(pivot_rename)
 # "X" and "..." should be NA
 subst_f <- function(df) {
   df <- df %>% 
-    dplyr::mutate(
-      value = as.numeric(
-        case_when(value == "-"                 ~ "0",
-                  value %in% c("X","..","...") ~ NA_character_,
-                  TRUE                         ~ value)
-        )
-      )
-}
+    dplyr::mutate(value = as.numeric(case_when(value == "-"                 ~ "0",
+                                               value %in% c("X","..","...") ~ NA_character_,
+                                               TRUE                         ~ value)
+                                     )
+                  )
+} # closes subst_f(df)
 
 ## check all tables' column names
 #
