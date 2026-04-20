@@ -169,7 +169,7 @@ state_area <- rbind(area_1985, area_1995, area_2006)
 state_farm <- rbind(farm_1985, farm_1995, farm_2006)
 
 # (4.3) join everything in a single table
-census_state <- state_area %>% 
+df_census_state <- state_area %>% 
   dplyr::full_join(state_farm, by=join_by(state,area_group,year)) %>%
   dplyr::select(state, year, area_group, farm_area_ha, n_farms) %>%
   dplyr::filter(area_group != "ignore") # to avoid double counting farm area, these observations must be removed
@@ -243,11 +243,11 @@ mun_area_group    <- mun_area_group    %>% dplyr::transmute(code_mun, name_mun, 
 mun_activity_area <- mun_activity_area %>% dplyr::transmute(code_mun, name_mun, year, area_group="total", activity_group,         day_group="total", activity_area)
 mun_workers       <- mun_workers       %>% dplyr::transmute(code_mun, name_mun, year, area_group="total", activity_group,         day_group,         workers)
 # (b) join everything
-census_mun <- mun_area_group %>%
+df_census_mun <- mun_area_group %>%
   dplyr::full_join(mun_activity_area, by=join_by(code_mun, name_mun, year, area_group, activity_group, day_group)) %>%
   dplyr::full_join(mun_workers,       by=join_by(code_mun, name_mun, year, area_group, activity_group, day_group)) 
 # (c) add a 'state' column and arrange table
-census_mun <- census_mun %>%
+df_census_mun <- df_census_mun %>%
   # extract "state" from "name_mun"
   dplyr::mutate(state=str_extract(name_mun,"(?<=\\()\\w{2}(?=\\))")) %>%
   # arrange column order
@@ -260,7 +260,7 @@ rm(mun_area_group, mun_activity_area, mun_workers)
 
 # (6) aggregate municipality-level data at the state level ----------------
 # (6.1) sum numeric values from municipalities in the same state
-mun_agg <- census_mun %>%
+mun_agg <- df_census_mun %>%
   # get rid of municipality identifiers
   dplyr::select(-code_mun, -name_mun) %>%
   # get rid of "landless" area group
@@ -274,18 +274,18 @@ mun_agg <- census_mun %>%
                    workers       = sum(workers,       na.rm=TRUE),
                    .groups = "drop")
 
-# (6.2) make sure that 'census_state' has all the same identifier columns as 'mun_agg'
-census_state <- census_state %>%
+# (6.2) make sure that 'df_census_state' has all the same identifier columns as 'mun_agg'
+df_census_state <- df_census_state %>%
   dplyr::transmute(state, year, area_group, activity_group="total", day_group="total",
                    farm_area_ha, n_farms)
 
 # note that the data in 'mun_agg' covers 1995, 2006 and 2017;
-# while the data in 'census_mun' covers 1985, 1995 and 2006
+# while the data in 'df_census_mun' covers 1985, 1995 and 2006
 #
 # also, the "area_group" classes in 2017 are different from the "area_group"
 # classes in 1985, 1995 and 2006
 #
-# finally, both 'mun_agg' and 'census_state' have columns named
+# finally, both 'mun_agg' and 'df_census_state' have columns named
 # "farm_area_ha" and "n_farms" - need to deal with this before joining
 
 # (6.3) separate the data in 'mun_agg' in 2017 and previous to 2017
@@ -293,18 +293,18 @@ mun_agg_2017 <- mun_agg %>% dplyr::filter(year  ==  "2017")
 mun_agg_prev <- mun_agg %>% dplyr::filter(year %in% c("1995","2006"))
 rm(mun_agg)
 
-# (6.4) join pre-2017 data to census_state
-# we just need columns "activity_area" and "workers", since 'census_state'
+# (6.4) join pre-2017 data to df_census_state
+# we just need columns "activity_area" and "workers", since 'df_census_state'
 # already has data on "farm_area_ha" and "n_farms" for the years before 2017
-census_state <- census_state %>%
+df_census_state <- df_census_state %>%
   dplyr::left_join(
     dplyr::select(mun_agg_prev, -farm_area_ha, -n_farms),
     by = join_by(state, year, area_group, activity_group, day_group)
   )
 rm(mun_agg_prev)
 
-# (6.5) join 2017 data to census_state
-# we could just rbind 'mun_agg_2017' to 'census_state', but the "area group" classes
+# (6.5) join 2017 data to df_census_state
+# we could just rbind 'mun_agg_2017' to 'df_census_state', but the "area group" classes
 # of 2017 are more disaggregated. I don't want to lose this information but I also
 # want it to be comparable with the previous year
 #
@@ -326,10 +326,10 @@ mun_agg_2017_as_prev <- mun_agg_2017_as_prev %>%
 # (c) avoid double counting: take only the rows with the new "over1kha" value for area_group
 mun_agg_2017_as_prev <- mun_agg_2017_as_prev %>%
   dplyr::filter(area_group=="over1kha")
-# (d) bind 2017 data to 'census_state'
-census_state <- rbind(census_state, mun_agg_2017, mun_agg_2017_as_prev)
+# (d) bind 2017 data to 'df_census_state'
+df_census_state <- rbind(df_census_state, mun_agg_2017, mun_agg_2017_as_prev)
 # (e) make NAs explicit and arrange table
-census_state <- census_state %>%
+df_census_state <- df_census_state %>%
   # NAs were ignored when I aggregated municipality-level data - make them explicit
   dplyr::mutate(across(c(farm_area_ha, n_farms, activity_area, workers), ~na_if(.x,0))) %>%
   # arrange row order

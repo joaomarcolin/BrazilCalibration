@@ -126,5 +126,7 @@ theme_set(theme_grey())
   - macroeconômico, temas, salário e renda, todas, salário mínimo vigente
 - IPEA's [interest rate data](https://ipeadata.gov.br/): cummulative monthly base interest rate 1985-2024, `data_inputs/IPEA/ipeadata_selic_acumulada.xls`
   - macroeconômico, temas, financeiras, todas, taxa de juros - Over/Selic - acumulada no mês
+- IPEA's [annual inflation rate data](https://ipeadata.gov.br/): cummulative yearly IPC-FIPE rate 1985-2024, `data_inputs/IPEA/ipeadata_ipc_fipe_anual.xls`
+  - macroeconômico, temas, preços, fipe, IPC (FIPE) - taxa de variação - anual
 - Paraná's Secretary of Agriculture [commodity prices data](https://www.agricultura.pr.gov.br/deral/precos): yearly data on commodity prices 1995-2023, `data_inputs/Parana/commodity_prices.xlsx`
   - "Preços de Venda no Atacado - histórico de preços mensais desde 1995"

@@ -87,12 +87,12 @@ PAM_soy_area    <- PAM_soy_area    %>% dplyr::select(code_mun, name_mun, year, p
 PAM_soy_output  <- PAM_soy_output  %>% dplyr::select(code_mun, year, pam_output_ton=value)
 PPM_cattle_herd <- PPM_cattle_herd %>% dplyr::select(code_mun, year, ppm_herd=value)
 # create final dataframe
-yearly_mun <- PAM_soy_area %>%
+df_yearly_mun <- PAM_soy_area %>%
   dplyr::full_join(PAM_soy_output,  by=join_by(code_mun,year)) %>%
   dplyr::full_join(PPM_cattle_herd, by=join_by(code_mun,year)) %>%
-  dplyr::full_join(mapbiomas_df,    by=join_by(code_mun,year))
+  dplyr::full_join(mapbiomas_data,  by=join_by(code_mun,year))
 # clean up
-rm(PAM_soy_area, PAM_soy_output, PPM_cattle_herd, mapbiomas_df)
+rm(PAM_soy_area, PAM_soy_output, PPM_cattle_herd, mapbiomas_data)
 
 
 

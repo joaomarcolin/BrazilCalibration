@@ -2,12 +2,12 @@
 # at the municipality level for 1985-2024
 
 # load table
-mapbiomas_df <- read_excel("data_inputs/Mapbiomas/MAPBIOMAS_COL10_MUNICIPALITY_EDITED.xlsx",
-                           col_types = c(rep("text",14),
-                                         rep("numeric",40)))
+mapbiomas_data <- read_excel("data_inputs/Mapbiomas/MAPBIOMAS_COL10_MUNICIPALITY_EDITED.xlsx",
+                             col_types = c(rep("text",14),
+                                           rep("numeric",40)))
 
 # remove unnecessary columns
-mapbiomas_df <- mapbiomas_df %>%
+mapbiomas_data <- mapbiomas_data %>%
   dplyr::select(code_mun=geocode,
                 class,
                 `1985`:`2024`)
@@ -45,25 +45,25 @@ dict <- c("0"  = "mb_notobs_ha",
           "33" = "mb_nonveg_ha",
           "75" = "mb_notobs_ha")
 
-## check if there are classes in mapbiomas_df that are not in dict
-#unknown <- setdiff(unique(mapbiomas_df$class), names(dict))
+## check if there are classes in mapbiomas_data that are not in dict
+#unknown <- setdiff(unique(mapbiomas_data$class), names(dict))
 #if (length(unknown) > 0) warning("Unmapped MapBiomas class codes: ", paste(unknown, collapse=", "))
 
-mapbiomas_df$class <- dict[mapbiomas_df$class]
+mapbiomas_data$class <- dict[mapbiomas_data$class]
 rm(dict)
 
 # summarize
-mapbiomas_df <- mapbiomas_df %>%
+mapbiomas_data <- mapbiomas_data %>%
   dplyr::group_by(code_mun, class) %>%
   dplyr::summarise(across(where(is.numeric), \(x) sum(x,na.rm=TRUE))) %>%
   dplyr::ungroup()
 
-# mapbiomas_df has "Lagoa dos Patos" (4300002) and "Lagoa Mirim" (4300001), which are not municipalities
-mapbiomas_df  <- mapbiomas_df  %>%
+# mapbiomas_data has "Lagoa dos Patos" (4300002) and "Lagoa Mirim" (4300001), which are not municipalities
+mapbiomas_data  <- mapbiomas_data  %>%
   dplyr::filter(!(code_mun %in% c("4300002","4300001")))
 
 # pivot table
-mapbiomas_df <- mapbiomas_df %>%
+mapbiomas_data <- mapbiomas_data %>%
   tidyr::pivot_longer(
     cols      = `1985`:`2024`,
     names_to  = "year",
