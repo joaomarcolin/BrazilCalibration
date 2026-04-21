@@ -87,12 +87,14 @@ theme_set(theme_grey())
 ## Geographic Information
 - IBGE's [2024 shapefiles](https://www.ibge.gov.br/geociencias/organizacao-do-territorio/malhas-territoriais/15774-malhas.html): municipality and state shapefiles for 2024, `data_inputs/IBGE/spatial/BR_Municipios_2024.shp` and `data_inputs/IBGE/spatial/BR_UF_2024.shp`
   - Under "Brasil", select "Municipos" and "Unidades da Federação"
-- IBGE's [2017 partition](www.ibge.gov.br/geociencias/cartas-e-mapas/redes-geograficas/15778-divisoes-regionais-do-brasil.html?edicao=15905&t=downloads) of Brazil into 'regiões geográficas imediatas/intermediárias': shapefiles of Brazil's RGIs and RGINTs from 2017, `data_inputs/IBGE/spatial/RG2017_rgi.shp` and `data_inputs/IBGE/spatial/RG2017_rgint.shp`
   - downloads, divisao\_regional\_do_brasil\_em\_regioes\_geograficas\_2017, shp, "RG2017\_rgi\_20180911.zip" and "RG2017\_rgint\_20180911.zip"
 - IBGE's [biomes shapefiles](www.ibge.gov.br/geociencias/informacoes-ambientais/estudos-ambientais/15842-biomas.html): shapefiles of Brazil's biomes, `data_inputs/IBGE/spatial/IBGE_biomas_v2025_dominios_vetor_e250K.shp`
   - vetores, vetor
 - Base dos Dados' [AMC table](https://basedosdados.org/dataset/5c9618d4-fd32-41ff-b834-61349a3bd65f?raw_data_source=02347e05-ec1b-4530-a64c-c779e85a7a7d): identifies municipalities or municipality groups that have not changed through time, `data_inputs/BdD/Brasil_AMC.csv`
 - Base dos Dados' [municipality codes table](https://basedosdados.org/dataset/33b49786-fb5f-496f-bb7c-9811c985af8e?table=dffb65ac-9df9-4151-94bf-88c45bfcb056): equivalence between municipalities' id codes in different Brazilian datasets, `data_inputs/BdD/Brasil_mun.csv`
+<!--
+- IBGE's [2017 partition](www.ibge.gov.br/geociencias/cartas-e-mapas/redes-geograficas/15778-divisoes-regionais-do-brasil.html?edicao=15905&t=downloads) of Brazil into 'regiões geográficas imediatas/intermediárias': shapefiles of Brazil's RGIs and RGINTs from 2017, `data_inputs/IBGE/spatial/RG2017_rgi.shp` and `data_inputs/IBGE/spatial/RG2017_rgint.shp`
+-->
 
 # Mapbiomas
 - Mapbiomas' [municipality-level tables](https://brasil.mapbiomas.org/en/estatisticas/) with data on Land Use and Cover variables, `data_inputs/Mapbiomas/MAPBIOMAS_COL10_MUNICIPALITY.xlsx`
@@ -130,3 +132,6 @@ theme_set(theme_grey())
   - macroeconômico, temas, preços, fipe, IPC (FIPE) - taxa de variação - anual
 - Paraná's Secretary of Agriculture [commodity prices data](https://www.agricultura.pr.gov.br/deral/precos): yearly data on commodity prices 1995-2023, `data_inputs/Parana/commodity_prices.xlsx`
   - "Preços de Venda no Atacado - histórico de preços mensais desde 1995"
+  - "Boi Gordo" - price of 15kg of cattle for slaughter;
+  - "Soja" - price of 60kg of soybean grain.
+  

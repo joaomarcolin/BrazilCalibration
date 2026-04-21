@@ -12,21 +12,71 @@ library(terra)
 library(sf)
 library(exactextractr)
 library(readxl)
+library(tictoc)
 
 # create output folders
 if (!dir.exists("data_outputs"))                dir.create("data_outputs")
 if (!dir.exists("data_outputs/1_census_data"))  dir.create("data_outputs/1_census_data")
 if (!dir.exists("data_outputs/2_yearly_data"))  dir.create("data_outputs/2_yearly_data")
-if (!dir.exists("data_outputs/3_geography"))    dir.create("data_outputs/3_geography")
-if (!dir.exists("data_outputs/4_cell_grid"))    dir.create("data_outputs/4_cell_grid")
+if (!dir.exists("data_outputs/3_cell_grid"))    dir.create("data_outputs/3_cell_grid")
+if (!dir.exists("data_outputs/4_geography"))    dir.create("data_outputs/4_geography")
 if (!dir.exists("results"))                     dir.create("results")
 
 # report data sources
 rmarkdown::render("data_sources.Rmd", output_file = "data_sources.html", quiet=TRUE)
 
-# settings
-param_plot_km <- 5    # must be a positive integer
-param_year    <- 1985 # must be 1985, 1995, 2006 or 2017
+
+# Settings for generating the cell grid -----------------------------------
+param_plot_km <- 5        # must be a positive integer
+param_year    <- 1985     # must be 1985, 1995, 2006 or 2017
+set_subset    <- FALSE    # if TRUE, the cell grid is constructed only for the set of states or the biome specified below
+set_name      <- "brazil" # name the area of interest, used to save the final cell grid
+
+if (set_subset) {
+  # how to divide the country?
+  set_subset_by   <- "state" # must be "state", "biome" or "both"
+  # what is the relevant area?
+  #   if subsetting by state, pick a vector of state acronyms - e.g., c("GO","MG","BA");
+  #   if subsetting by biome, pick "cerrado" or "amazon"
+  #   if subsetting by both,  pick a vector where the first element is a biome and the following elements are state acronyms
+  set_subset_area <- c("GO", "MT", "MS", "MA", "TO", "PI", "BA", "DF")
+}
+
+
+# Check that settings are valid -------------------------------------------
+if (set_subset) {
+  
+  # check that set_subset_by has a valid value
+  if (!set_subset_by %in% c("state", "biome", "both")) {
+    stop("with set_subset==TRUE, set_subset_by must be equal to 'state', 'biome' or 'both'.")
+  }
+  
+  # establish 
+  
+  valid_states <- c("AC", "AL", "AM", "AP", "BA", "CE", "DF", "ES", "GO",
+                    "MA", "MG", "MS", "MT", "PA", "PB", "PE", "PI", "PR",
+                    "RJ", "RN", "RO", "RR", "RS", "SC", "SE", "SP", "TO")
+  valid_biomes <- c("amazon", "caatinga", "cerrado", "atlantic", "pampa","pantanal")
+  
+}
+
+if (set_subset & set_subset_by=="state") {
+  # if subsetting by state, check that the selection is ok
+  
+}
+
+
+if (set_subset) {
+  # subset by what? should be "state", "biome" or "both"
+  set_subset_by  <- "state"
+  # what's the subset?
+  if (set_subset_by=="state") {
+    #  if set_subset_by=="state", set_subset_area must be a character vector with state acronyms
+    set_subset_area <- c("GO", "MT", "MS", "MA", "TO", "PI", "BA", "DF")
+  } else if (set_subset_by=="biome")
+  #  if set_subset_by=="biome", set_subset_area must be either "cerrado" or "amazon"
+  #  if set_subset_by=="both",  set_subset_area must be start with "cerrado" or "amazon", followeb by state acronyms
+}
 
 # (1) agriculture census data ---------------------------------------------
 # data available at the state- and municipality-level for 1985, 1995, 2006 and 2017,
@@ -49,32 +99,32 @@ source("scripts/yearly3_price_data.R")     # get yearly country-level variables
 readr::write_csv(df_yearly_mun,    "data_outputs/2_yearly_data/municipality_data.csv")
 readr::write_csv(df_yearly_prices, "data_outputs/2_yearly_data/prices_data.csv")
 
-# (3) municipality geographical analysis ----------------------------------
-# creates a dataframe with municipality identifiers, group municipalities by region,
-# identify which municipalities were created since 1985 to deal with NAs, and
-# calculate municipality total area and area per biome
-source("scripts/mun1_load_data.R")
-# saves outputs
-readr::write_csv(df_brazil_mun, "data_outputs/3_geography/municipalities.csv")
-
-# (4) cell grid -----------------------------------------------------------
+# (3) cell grid -----------------------------------------------------------
 # creates output folders
-if (!dir.exists("data_outputs/4_cell_grid/1_reproject"))     dir.create("data_outputs/4_cell_grid/1_reproject")
-if (!dir.exists("data_outputs/4_cell_grid/2_reclass"))       dir.create("data_outputs/4_cell_grid/2_reclass")
-if (!dir.exists("data_outputs/4_cell_grid/3_create_grid"))   dir.create("data_outputs/4_cell_grid/3_create_grid")
-if (!dir.exists("data_outputs/4_cell_grid/4_treat_grid"))    dir.create("data_outputs/4_cell_grid/4_treat_grid")
-if (!dir.exists("data_outputs/4_cell_grid/5_grid_lulc"))     dir.create("data_outputs/4_cell_grid/5_grid_lulc")
-if (!dir.exists("data_outputs/4_cell_grid/6_complete_grid")) dir.create("data_outputs/4_cell_grid/6_complete_grid")
+if (!dir.exists("data_outputs/3_cell_grid/1_reproject"))     dir.create("data_outputs/3_cell_grid/1_reproject")
+if (!dir.exists("data_outputs/3_cell_grid/2_recode_lulc"))   dir.create("data_outputs/3_cell_grid/2_recode_lulc")
+if (!dir.exists("data_outputs/3_cell_grid/3_create_grid"))   dir.create("data_outputs/3_cell_grid/3_create_grid")
+if (!dir.exists("data_outputs/3_cell_grid/4_treat_grid"))    dir.create("data_outputs/3_cell_grid/4_treat_grid")
+if (!dir.exists("data_outputs/3_cell_grid/5_grid_lulc"))     dir.create("data_outputs/3_cell_grid/5_grid_lulc")
+if (!dir.exists("data_outputs/3_cell_grid/6_complete_grid")) dir.create("data_outputs/3_cell_grid/6_complete_grid")
 # create grid and calculate plot-level values
 source("scripts/spatial1_reproject.R")     # reproject shapefiles and rasters
-source("scripts/spatial2_reclass.R")       # reclass Mapbiomas' rasters
+source("scripts/spatial2_recode_lulc.R")   # reclass Mapbiomas' rasters
 source("scripts/spatial3_create_grid.R")   # create grid
 source("scripts/spatial4_treat_grid.R")    # identify farms
 source("scripts/spatial5_grid_lulc.R")     # calculate plot-level LULC variables
 source("scripts/spatial6_complete_grid.R") # generate final grid
 # save final data for calibration
-readr::write_csv(grid_vars, paste0("data_outputs/4_cell_grid/6_grid_complete/BR_grid_vars_",param_plot_km,"km.csv"))
-sf::st_write(grid_geom,     paste0("data_outputs/4_cell_grid/6_grid_complete/BR_grid_geom_",param_plot_km,"km.shp"), delete_layer=TRUE)
+readr::write_csv(grid_vars, paste0("data_outputs/3_cell_grid/6_grid_complete/BR_grid_vars_",param_plot_km,"km.csv"))
+sf::st_write(grid_geom,     paste0("data_outputs/3_cell_grid/6_grid_complete/BR_grid_geom_",param_plot_km,"km.shp"), delete_layer=TRUE)
+
+# (4) municipality geographical analysis ----------------------------------
+# creates a dataframe with municipality identifiers, group municipalities by region,
+# identify which municipalities were created since 1985 to deal with NAs, and
+# calculate municipality total area and area per biome
+source("scripts/mun1_load_data.R")
+# saves outputs
+readr::write_csv(df_brazil_mun, "data_outputs/4_geography/municipalities.csv")
 
 # (5) report results ------------------------------------------------------
 
