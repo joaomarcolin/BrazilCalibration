@@ -1,10 +1,11 @@
 ## 2025 11 23
 ## this script reprojects all the spatial data to the same cartographic projection
 ##
-## IBGE's shapefiles come in SIRGAS 2000 Geographic (EPSG:4674; Geocentric Reference System for the Americas);
-## Mapbiomas' rasters come in  WGS84 Geographic (EPSG:4326; World Geodetic System 1984);
-## CNUC's shapefile comes in SIRGAS 2000 Geographic (EPSG:4674; Geocentric Reference System for the Americas);
-## Funai's shapefile comes in SIRGAS 2000 Geographic (EPSG:4674; Geocentric Reference System for the Americas);
+## IBGE's shapefiles come  in EPSG:4674 (SIRGAS 2000 Geographic, Geocentric Reference System for the Americas);
+## CNUC's shapefile  comes in EPSG:4674 (SIRGAS 2000 Geographic, Geocentric Reference System for the Americas);
+## Funai's shapefile comes in EPSG:4674 (SIRGAS 2000 Geographic, Geocentric Reference System for the Americas);
+## FAO GAEZ's raster comes in EPSG:4326 (WGS84 Geographic, World Geodetic System 1984);
+## Mapbiomas' rasters come in EPSG:4326 (WGS84 Geographic, World Geodetic System 1984);
 ##
 ## They are all reprojected to EPSG5880 (metric projection).
 ##
@@ -95,8 +96,11 @@ states_sf <- states_sf %>%
     geometry
   )
 
-# (1.5) dissolve state boundaries and get brazil_df
-brazil_sf <- states_sf %>%
+# (1.5) dissolve biome boundaries and get brazil_df
+brazil_sf <- biomes_sf %>%
+  # ignore islands
+  dplyr::filter(name_biome != "islands") %>%
+  # dissolve and merge
   sf::st_union() %>%
   sf::st_as_sf()
 
@@ -107,52 +111,7 @@ sf::st_write(brazil_sf, "data_outputs/3_cell_grid/1_reproject/brazil_EPSG5880.sh
 sf::st_write(biomes_sf, "data_outputs/3_cell_grid/1_reproject/biomes_EPSG5880.shp", delete_layer=TRUE)
 rm(cities_sf, states_sf, brazil_sf, biomes_sf)
 
-# (2) Mapbiomas -----------------------------------------------------------
-# reproject from EPSG4326 (geographic) to EPSG5880 (metric)
-# steps: (a) read raster file; (b) reproject; (c) save; (d) remove objects
-#
-# this takes a terribly long time to run: about 3h30 min per year.
-# do it only once and hope that you won't need to add more years
-
-## previous version:
-## YYYY - 1985, 1995, 2006, 2017, 2024
-#mb_YYYY_rast     <- terra::rast("data_inputs/Mapbiomas/brazil_coverage_YYYY.tif")
-#reproj_YYYY <- terra::project(mb_YYYY_rast, y = "epsg:5880", method = "near")
-#terra::writeRaster(reproj_YYYY, "data_outputs/3_cell_grid/1_reproject/mapbiomas2006_EPSG5880.tif", overwrite=TRUE)
-#rm(mb_YYYY_rast, reproj_YYYY)
-
-# auxiliary function to load, reproject, and save new .tif
-reproject_mb_f <- function(year) {
-  # set input and output paths
-  input_path  <- paste0("data_inputs/Mapbiomas/brazil_coverage_",year,".tif")
-  output_path <- paste0("data_outputs/3_cell_grid/1_reproject/mapbiomas",year,"_EPSG5880.tif")
-  # load raster
-  terra::rast(input_path) %>%
-    # reproject raster
-    terra::project(y = "epsg:5880", method = "near") %>%
-    # save reprojected raster
-    terra::writeRaster(output_path, overwrite = TRUE)
-}
-
-## load, reproject and save LULC rasters
-#years <- c(1985, 1995, 2006, 2017, 2024)
-#tic("Reproject Mapbiomas' rasters")
-#for (yr in years) {
-#  tic(paste("Reprojected and saved",yr,"raster."))
-#  reproject_mb_f(yr)
-#  toc()
-#}
-#toc()
-#rm(yr, years, reproject_mb_f)
-
-Sys.time()                             ##############
-start<-Sys.time()                      #            #
-tic(paste("Ended 1995 raster."))       #    TRY     #
-reproject_mb_f(1995)                   #    THIS    #
-toc()                                  #            #
-end<-Sys.time()                        ##############
-
-# (3) Conservation Units and Indigenous Territories -----------------------
+# (2) Conservation Units and Indigenous Territories -----------------------
 # open original shapefiles
 cnuc_sf  <- sf::st_read("data_inputs/CNUC/cnuc_2025_08.shp")
 funai_sf <- sf::st_read("data_inputs/FUNAI/tis_poligonaisPolygon.shp")
@@ -177,9 +136,9 @@ protected_areas_sf <- rbind(cnuc_sf, funai_sf) %>%
 sf::st_write(protected_areas_sf, "data_outputs/3_cell_grid/1_reproject/protected_areas_EPSG5880.shp", delete_layer=TRUE)
 rm(cnuc_sf, funai_sf, protected_areas_sf)
 
-# (4) FAO GAEZ attainable yield -------------------------------------------
+# (3) FAO GAEZ attainable yield -------------------------------------------
 # load data (for the whole world)
-fao_rast <- terra::rast("data_inputs/FAO/ylHr_soy.tif", )
+fao_rast <- terra::rast("data_inputs/FAO/ylHr_soy.tif")
 
 # get Brazil's polygon to crop FAO's raster
 brazil_sf <- sf::st_read("data_outputs/3_cell_grid/1_reproject/brazil_EPSG5880.shp") %>%
@@ -196,3 +155,35 @@ fao_brazil_rast <- terra::project(fao_brazil_rast, y = "epsg:5880", method = "bi
 terra::writeRaster(fao_brazil_rast, "data_outputs/3_cell_grid/1_reproject/fao_brazil_soy_yield.tif", overwrite=TRUE)
 # clean up
 rm(fao_rast, brazil_sf, fao_brazil_rast)
+
+
+# (4) Mapbiomas -----------------------------------------------------------
+# reproject from EPSG4326 (geographic) to EPSG5880 (metric)
+#
+# this takes a terribly long time to run: about 4h min per year.
+# do it only once and hope that you won't need to add more years
+
+# auxiliary function to load, reproject, and save new .tif
+reproject_mb_f <- function(year) {
+  # set input and output paths
+  input_path  <- paste0("data_inputs/Mapbiomas/brazil_coverage_",year,".tif")
+  output_path <- paste0("data_outputs/3_cell_grid/1_reproject/mapbiomas",year,"_EPSG5880.tif")
+  # load raster
+  terra::rast(input_path) %>%
+    # reproject raster
+    terra::project(y = "epsg:5880", method = "near") %>%
+    # save reprojected raster
+    terra::writeRaster(output_path, overwrite = TRUE)
+}
+
+# load, reproject and save LULC rasters
+years <- c(1985, 1995, 2006, 2017, 2024)
+tic("Reproject Mapbiomas' rasters")
+for (yr in years) {
+  tic(paste("Reprojected and saved",yr,"raster."))
+  reproject_mb_f(yr)
+  toc()
+}
+toc()
+rm(yr, years, reproject_mb_f)
+

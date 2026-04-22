@@ -27,15 +27,7 @@ reclass_matrix <- base::rbind(
 )
 
 # (2) recode and save output ----------------------------------------------
-# takes about 15 min per year
-
-# previous version
-## YYYY
-#MB_YYYY  <- terra::rast("data_outputs/3_cell_grid/1_reproject/mapbiomas1985_EPSG5880.tif")
-#LUC_YYYY <- terra::classify(MB_YYYY, reclass_matrix)
-#terra::writeRaster(LUC_YYYY, "data_outputs/3_cell_grid/2_recode_lulc/lulc_YYYY.tif",
-#                   overwrite=TRUE, NAflag=0, datatype="INT1U")
-#rm(LUC_YYYY, MB_YYYY)
+# takes about 20 min per year
 
 # auxiliary function to load, recode and save rasters
 recode_mb_f <- function(year) {
@@ -54,22 +46,15 @@ recode_mb_f <- function(year) {
       datatype  = "INT1U")
 }
 
-## load, recode and save LULC rasters
-#years <- c(1985, 1995, 2006, 2017, 2024)
-#tic("Recode Mapbiomas' rasters")
-#for (yr in years) {
-#  tic(paste("Recoded and saved",yr,"raster."))
-#  recode_mb_f(yr)
-#  toc()
-#}
-#toc()
-
-Sys.time()                       ##############
-start<-Sys.time()                #            #
-tic(paste("Ended 1985 raster.")) #    TRY     #
-recode_mb_f(1985)                #    THIS    #
-toc()                            #            #
-end<-Sys.time()                  ##############
+# load, recode and save LULC rasters
+years <- c(1985, 1995, 2006, 2017, 2024)
+tic("Recode Mapbiomas' rasters")
+for (yr in years) {
+  tic(paste("Recoded and saved",yr,"raster."))
+  recode_mb_f(yr)
+  toc()
+}
+toc()
 
 # clean up
 rm(yr, years, reclass_matrix, recode_mb_f)
@@ -83,3 +68,4 @@ rm(yr, years, reclass_matrix, recode_mb_f)
 #
 # 0 and 13 show up in the data but aren't present in MapBiomas' variable dictionary
 # 27 doesn't show up in the data but is present in MapBiomas' variable dictionary
+

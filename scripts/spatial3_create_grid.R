@@ -120,11 +120,7 @@ if (set_subset==FALSE) {
   rm(n_polygons)
 }
 
-
-# -------------------------------------------------------------------------
-# -------------------------------------------------------------------------
-# -------------------------------------------------------------------------
-# (1) Create grid template and initialize cells ---------------------------
+# (2) Create grid template and initialize cells ---------------------------
 area_rast <- terra::vect(area_sf)
 cell_m <- param_plot_km * 1000
 grid_template <- terra::rast(ext(area_rast), resolution = cell_m, crs=crs(area_rast))
@@ -146,7 +142,7 @@ grid_sf           <- sf::st_as_sf(grid_polygons)
 cat("Finished st_as_sf:", format(Sys.time(), "%H:%M:%S"), "\n")
 names(grid_sf)[1] <- "cell_id"
 
-# (2) Check plot overlap with area shapefile ------------------------------
+# (3) Check plot overlap with area shapefile ------------------------------
 # create high-resolution raster (1km) for accurate area calculations
 # rasterize() requires a resolution in meters and param_plot_km is in kilometers
 if (param_plot_km>=3) {
@@ -182,19 +178,20 @@ if (param_plot_km>=3) {
 } # closes if-else
 
 # remove cells with <=75% overlap
-grid_raster[!grid_raster %in% valid_ids] <- NA
+grid_rast[!grid_rast %in% valid_ids] <- NA
 # filter vector grid to keep only valid cells and select relevant columns
 grid_sf <- grid_sf %>%
   dplyr::filter(overlap_fraction>0.75) %>%
   dplyr::select(cell_id,geometry,area=overlap_area)
 
-# (3) saves grid outputs --------------------------------------------------
+# (4) saves grid outputs --------------------------------------------------
 # sets output path for raster and vector formats
-path_out_tif <- paste("data_outputs/3_cell_grid/3_create_grid/",set_name,"_grid_",param_plot_km,"km.tif", sep="")
-path_out_shp <- paste("data_outputs/3_cell_grid/3_create_grid/",set_name,"_grid_",param_plot_km,"km.shp", sep="")
+path_out_tif <- paste0("data_outputs/3_cell_grid/3_create_grid/",set_name,"_grid_",param_plot_km,"km.tif")
+path_out_shp <- paste0("data_outputs/3_cell_grid/3_create_grid/",set_name,"_grid_",param_plot_km,"km.shp")
 # saves .shp and .tif
 sf::st_write(grid_sf, path_out_shp, quiet = TRUE, append=FALSE, delete_layer=TRUE)
-terra::writeRaster(grid_raster, path_out_tif, overwrite = TRUE)
+terra::writeRaster(grid_rast, path_out_tif, overwrite = TRUE)
 # removes auxiliary objects
 rm(area_rast, area_sf, cell_m, grid_polygons,
    grid_template, path_out_shp, path_out_tif, valid_ids)
+

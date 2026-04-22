@@ -42,42 +42,6 @@ if (set_subset) {
   set_subset_area <- c("GO", "MT", "MS", "MA", "TO", "PI", "BA", "DF")
 }
 
-
-# Check that settings are valid -------------------------------------------
-if (set_subset) {
-  
-  # check that set_subset_by has a valid value
-  if (!set_subset_by %in% c("state", "biome", "both")) {
-    stop("with set_subset==TRUE, set_subset_by must be equal to 'state', 'biome' or 'both'.")
-  }
-  
-  # establish 
-  
-  valid_states <- c("AC", "AL", "AM", "AP", "BA", "CE", "DF", "ES", "GO",
-                    "MA", "MG", "MS", "MT", "PA", "PB", "PE", "PI", "PR",
-                    "RJ", "RN", "RO", "RR", "RS", "SC", "SE", "SP", "TO")
-  valid_biomes <- c("amazon", "caatinga", "cerrado", "atlantic", "pampa","pantanal")
-  
-}
-
-if (set_subset & set_subset_by=="state") {
-  # if subsetting by state, check that the selection is ok
-  
-}
-
-
-if (set_subset) {
-  # subset by what? should be "state", "biome" or "both"
-  set_subset_by  <- "state"
-  # what's the subset?
-  if (set_subset_by=="state") {
-    #  if set_subset_by=="state", set_subset_area must be a character vector with state acronyms
-    set_subset_area <- c("GO", "MT", "MS", "MA", "TO", "PI", "BA", "DF")
-  } else if (set_subset_by=="biome")
-  #  if set_subset_by=="biome", set_subset_area must be either "cerrado" or "amazon"
-  #  if set_subset_by=="both",  set_subset_area must be start with "cerrado" or "amazon", followeb by state acronyms
-}
-
 # (1) agriculture census data ---------------------------------------------
 # data available at the state- and municipality-level for 1985, 1995, 2006 and 2017,
 # though some variables are not available for every year or every aggregation level
@@ -107,9 +71,9 @@ if (!dir.exists("data_outputs/3_cell_grid/3_create_grid"))   dir.create("data_ou
 if (!dir.exists("data_outputs/3_cell_grid/4_treat_grid"))    dir.create("data_outputs/3_cell_grid/4_treat_grid")
 if (!dir.exists("data_outputs/3_cell_grid/5_grid_lulc"))     dir.create("data_outputs/3_cell_grid/5_grid_lulc")
 if (!dir.exists("data_outputs/3_cell_grid/6_complete_grid")) dir.create("data_outputs/3_cell_grid/6_complete_grid")
-# create grid and calculate plot-level values
-source("scripts/spatial1_reproject.R")     # reproject shapefiles and rasters
-source("scripts/spatial2_recode_lulc.R")   # reclass Mapbiomas' rasters
+## create grid and calculate plot-level values
+#source("scripts/spatial1_reproject.R")     # reproject shapefiles and rasters # only need to run it once
+#source("scripts/spatial2_recode_lulc.R")   # reclass Mapbiomas' rasters       # only need to run it once
 source("scripts/spatial3_create_grid.R")   # create grid
 source("scripts/spatial4_treat_grid.R")    # identify farms
 source("scripts/spatial5_grid_lulc.R")     # calculate plot-level LULC variables

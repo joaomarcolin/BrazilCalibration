@@ -102,6 +102,11 @@ df_brazil_mun$code_amc[df_brazil_mun$code_mun=="5006275"] <- "1073"
 ## since this municipality existed in 1980, I give it an exclusive code_amc value
 df_brazil_mun$code_amc[df_brazil_mun$code_mun=="3104700"] <- as.character(max(as.numeric(df_brazil_mun$code_amc))+1)
 
+# Municipalities with island area:
+#code_mun  name_mun             state
+#2605459   Fernando de Noronha  PE
+#2906907   Caravelas            BA
+#3205309   Vitória              ES
 
 ## (5) check code_mun values across datasets -------------------------------
 ## at this point, we have three dataframes with municipality-level data:
