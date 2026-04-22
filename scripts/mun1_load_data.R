@@ -1,4 +1,4 @@
-# This script sorts out municipality and amc codes
+# This script loads municipality-level geographic information
 #
 # we want to consider municipalities that were created after 1985 so the data
 # is comparable throughout the period
@@ -107,36 +107,3 @@ df_brazil_mun$code_amc[df_brazil_mun$code_mun=="3104700"] <- as.character(max(as
 #2605459   Fernando de Noronha  PE
 #2906907   Caravelas            BA
 #3205309   Vitória              ES
-
-## (5) check code_mun values across datasets -------------------------------
-## at this point, we have three dataframes with municipality-level data:
-## 'df_brazil_mun' stores identifiers, geographic and administrative divisions, biome area and total area
-## 'df_census_mun' stores agriculture census data for 1995, 2006 and 2017
-## 'df_yearly_mun' stores yearly data on soybean farming and cattle ranching output for 1985-2024
-#
-## 'df_brazil_mun': 5570 unique municipalities
-## 'df_census_mun': 4956 to 5563 unique municipalities depending on census year
-## 'df_yearly_mun': 5570 unique municipalities every year
-#
-#census_mun_1995 <- df_census_mun %>% dplyr::filter(year=="1995") %>% dplyr::select(code_mun, name_mun, state) %>% unique()
-#census_mun_2006 <- df_census_mun %>% dplyr::filter(year=="2006") %>% dplyr::select(code_mun, name_mun, state) %>% unique()
-#census_mun_2017 <- df_census_mun %>% dplyr::filter(year=="2017") %>% dplyr::select(code_mun, name_mun, state) %>% unique()
-#
-#mun_all_years   <- intersect(census_mun_1995$code_mun,
-#                             census_mun_2006$code_mun)
-#mun_all_years   <- intersect(mun_all_years,
-#                             census_mun_2017$code_mun)
-#length(mun_all_years)
-## 4950 municipalities are present in every census year
-#incomplete_mun <- rbind(census_mun_1995[!(census_mun_1995$code_mun%in%mun_all_years),],
-#                        census_mun_2006[!(census_mun_2006$code_mun%in%mun_all_years),],
-#                        census_mun_2017[!(census_mun_2017$code_mun%in%mun_all_years),])
-#incomplete_mun <- unique(incomplete_mun)
-## 614 municipalities don't show up in at least one of the census years
-#
-#incomplete_mun_yearly <- df_yearly_mun %>%
-#  dplyr::filter(code_mun %in% incomplete_mun$code_mun)
-## many of the municipalities that are missing in one of the census year have 
-## non-NA values for PAM and PPM's values, which means that they already existed
-## in the 1980s and are truly missing from the Census - the other were probably created
-## after 1995.
