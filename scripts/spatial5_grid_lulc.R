@@ -64,7 +64,7 @@ get_lulc_vars <- function(my_grid, year) {
 
 # (3) processes all years -------------------------------------------------
 # takes about 50 min per year
-years <- c("1985")#, "1995", "2006", "2017", "2024")
+years <- c("1985", "1995", "2006", "2017", "2024")
 
 tic("Processing all years")
 for (yr in years) {
