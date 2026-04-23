@@ -19,14 +19,15 @@ if (!dir.exists("data_outputs"))                dir.create("data_outputs")
 if (!dir.exists("data_outputs/1_census_data"))  dir.create("data_outputs/1_census_data")
 if (!dir.exists("data_outputs/2_yearly_data"))  dir.create("data_outputs/2_yearly_data")
 if (!dir.exists("data_outputs/3_cell_grid"))    dir.create("data_outputs/3_cell_grid")
-if (!dir.exists("data_outputs/4_geography"))    dir.create("data_outputs/4_geography")
+if (!dir.exists("data_outputs/4_final"))        dir.create("data_outputs/4_final")
 if (!dir.exists("results"))                     dir.create("results")
 
 # report data sources
 rmarkdown::render("data_sources.Rmd", output_file = "data_sources.html", quiet=TRUE)
 
-
 # Settings for generating the cell grid -----------------------------------
+# The settings bellow are only used from section (3) on
+
 param_plot_km <- 5        # must be a positive integer
 param_year    <- 1985     # must be 1985, 1995, 2006 or 2017
 set_subset    <- FALSE    # if TRUE, the cell grid is constructed only for the set of states or the biome specified below
@@ -49,7 +50,7 @@ source("scripts/census1_load_data.R")  # load agriculture census data
 source("scripts/census2_treat_data.R") # tidy agriculture census data
 # saves outputs
 readr::write_csv(df_census_mun,   "data_outputs/1_census_data/IBGE_agricensus_municipalities.csv")
-readr::write_csv(df_census_state, "data_outputs/1_census_data/IBGE_agricensus_states.csv")
+readr::write_csv(df_census_state, "data_outputs/4_final/df_states.csv")
 
 # (2) yearly data ---------------------------------------------------------
 # municipality-level time series for soybean output, soybean farming area,
@@ -61,7 +62,7 @@ source("scripts/yearly2_load_PAM_PPM.R")   # load PAM and PPM data and create 'd
 source("scripts/yearly3_price_data.R")     # get yearly country-level variables
 # saves outputs
 readr::write_csv(df_yearly_mun,    "data_outputs/2_yearly_data/municipality_data.csv")
-readr::write_csv(df_yearly_prices, "data_outputs/2_yearly_data/prices_data.csv")
+readr::write_csv(df_yearly_prices, "data_outputs/4_final/df_prices.csv")
 
 # (3) cell grid -----------------------------------------------------------
 # creates output folders
@@ -79,16 +80,16 @@ source("scripts/spatial4_treat_grid.R")    # identify farms
 source("scripts/spatial5_grid_lulc.R")     # calculate plot-level LULC variables
 source("scripts/spatial6_complete_grid.R") # generate final grid
 # save final data for calibration
-readr::write_csv(grid_vars, paste0("data_outputs/3_cell_grid/6_grid_complete/BR_grid_vars_",param_plot_km,"km.csv"))
-sf::st_write(grid_geom,     paste0("data_outputs/3_cell_grid/6_grid_complete/BR_grid_geom_",param_plot_km,"km.shp"), delete_layer=TRUE)
+readr::write_csv(grid_df, paste0("data_outputs/3_cell_grid/6_complete_grid/",set_name,"_grid_df_",param_plot_km,"km.csv"))
+sf::st_write(grid_sf,     paste0("data_outputs/4_final/",set_name,"_grid_",param_plot_km,"km.shp"), delete_layer=TRUE)
 
-# (4) municipality geographical analysis ----------------------------------
-# creates a dataframe with municipality identifiers, group municipalities by region,
-# identify which municipalities were created since 1985 to deal with NAs, and
-# calculate municipality total area and area per biome
-source("scripts/mun1_load_data.R")
+# (4) final results -------------------------------------------------------
+source("scripts/final1_data.R") # group municipality-level data
 # saves outputs
-readr::write_csv(df_brazil_mun, "data_outputs/4_geography/municipalities.csv")
+readr::write_csv(df_census_mun, "data_outputs/4_final/df_mun_census.csv")
+readr::write_csv(df_yearly_mun, "data_outputs/4_final/df_mun_yearly.csv")
+readr::write_csv(df_brazil_mun, "data_outputs/4_final/df_municipalities.csv")
+readr::write_csv(grid_df,       "data_outputs/4_final/grid_df.csv")
 
 # (5) report results ------------------------------------------------------
 
