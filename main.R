@@ -29,7 +29,7 @@ rmarkdown::render("data_sources.Rmd", output_file = "data_sources.html", quiet=T
 # The settings bellow are only used from section (3) on
 
 param_plot_km <- 5        # must be a positive integer
-param_year    <- 1985     # must be 1985, 1995, 2006 or 2017
+#param_year    <- 1985     # must be 1985, 1995, 2006 or 2017
 set_subset    <- FALSE    # if TRUE, the cell grid is constructed only for the set of states or the biome specified below
 set_name      <- "brazil" # name the area of interest, used to save the final cell grid
 
@@ -71,7 +71,6 @@ if (!dir.exists("data_outputs/3_cell_grid/2_recode_lulc"))   dir.create("data_ou
 if (!dir.exists("data_outputs/3_cell_grid/3_create_grid"))   dir.create("data_outputs/3_cell_grid/3_create_grid")
 if (!dir.exists("data_outputs/3_cell_grid/4_treat_grid"))    dir.create("data_outputs/3_cell_grid/4_treat_grid")
 if (!dir.exists("data_outputs/3_cell_grid/5_grid_lulc"))     dir.create("data_outputs/3_cell_grid/5_grid_lulc")
-if (!dir.exists("data_outputs/3_cell_grid/6_complete_grid")) dir.create("data_outputs/3_cell_grid/6_complete_grid")
 ## create grid and calculate plot-level values
 #source("scripts/spatial1_reproject.R")     # reproject shapefiles and rasters # only need to run it once
 #source("scripts/spatial2_recode_lulc.R")   # reclass Mapbiomas' rasters       # only need to run it once
@@ -79,17 +78,19 @@ source("scripts/spatial3_create_grid.R")   # create grid
 source("scripts/spatial4_treat_grid.R")    # identify farms
 source("scripts/spatial5_grid_lulc.R")     # calculate plot-level LULC variables
 source("scripts/spatial6_complete_grid.R") # generate final grid
+
 # save final data for calibration
-readr::write_csv(grid_df, paste0("data_outputs/3_cell_grid/6_complete_grid/",set_name,"_grid_df_",param_plot_km,"km.csv"))
-sf::st_write(grid_sf,     paste0("data_outputs/4_final/",set_name,"_grid_",param_plot_km,"km.shp"), delete_layer=TRUE)
+readr::write_csv(df_grid, paste0("data_outputs/4_final/df_",set_name,"_grid_",param_plot_km,"km.csv"))
+sf::st_write(sf_grid,     paste0("data_outputs/4_final/sf_",set_name,"_grid_",param_plot_km,"km.shp"), delete_layer=TRUE)
 
 # (4) final results -------------------------------------------------------
-source("scripts/final1_data.R") # group municipality-level data
+source("scripts/final1_data.R")           # group municipality-level data
+source("scripts/final2_initialization.R") # generate final grid_df
 # saves outputs
-readr::write_csv(df_census_mun, "data_outputs/4_final/df_mun_census.csv")
-readr::write_csv(df_yearly_mun, "data_outputs/4_final/df_mun_yearly.csv")
-readr::write_csv(df_brazil_mun, "data_outputs/4_final/df_municipalities.csv")
-readr::write_csv(grid_df,       "data_outputs/4_final/grid_df.csv")
+readr::write_csv(df_census_mun,     "data_outputs/4_final/df_mun_census.csv")
+readr::write_csv(df_yearly_mun,     "data_outputs/4_final/df_mun_yearly.csv")
+readr::write_csv(df_brazil_mun,     "data_outputs/4_final/df_brazil_mun.csv")
+readr::write_csv(df_municipalities, "data_outputs/4_final/df_municipalities.csv")
 
 # (5) report results ------------------------------------------------------
 
@@ -100,7 +101,7 @@ readr::write_csv(grid_df,       "data_outputs/4_final/grid_df.csv")
 #source("scripts/yearly5_price_series.R")      # get yearly country-level variables
 
 # define which states will be included in the report
-# "SP" and "MG" also have significative Cerrado area but were not included
+# "SP" and "MG" also have significant Cerrado area but were not included
 cerrado_states <- c("GO", "MT", "MS", "MA", "TO", "PI", "BA", "DF")
 # render report
 rmarkdown::render("report.Rmd", output_file = "report.html")

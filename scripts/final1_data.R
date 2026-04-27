@@ -4,7 +4,7 @@
 # is comparable throughout the period
 
 # (1) load inputs ---------------------------------------------------------
-# load table with muncipality codes equivalence
+# load table with municipality codes equivalence
 brazil_mun_df <- read_csv("data_inputs/BdD/brasil_mun.csv", col_types = cols(.default = col_character())) %>%
   dplyr::select(
     code_mun   = id_municipio,              name_mun     = nome,
@@ -50,14 +50,6 @@ df_yearly_mun    <- readr::read_csv("data_outputs/2_yearly_data/municipality_dat
                                                      )
                                     )
 
-# load cell-level dataframe
-grid_df <- read_csv(paste0("data_outputs/3_cell_grid/6_complete_grid/",set_name,"_grid_df_",param_plot_km,"km.csv"),
-                    col_types = cols(.default   = col_number(),
-                                     cell_id    = col_character(),
-                                     code_mun   = col_character(),
-                                     code_biome = col_character()
-                                     )
-                    )
                                     
 # (2) calculate biome area per municipality -------------------------------
 # intersect municipalities' and biomes' polygons
@@ -120,6 +112,8 @@ df_brazil_mun <- brazil_amc_df %>%
     mun_protected_df,
     by = "code_mun"
   )
+
+df_brazil_mun$legal_amazon <- as.logical(as.integer(df_brazil_mun$legal_amazon))
 
 # clean up
 rm(brazil_amc_df, brazil_mun_df, mun_biome_df, mun_protected_df)
@@ -204,6 +198,4 @@ rm(amc_has_mun_missing_in_1995, amc_has_mun_missing_in_2006, amc_has_mun_missing
 df_census_mun <- df_codes %>% dplyr::left_join(df_census_mun, by="code_mun")
 df_yearly_mun <- df_codes %>% dplyr::left_join(df_yearly_mun, by="code_mun")
 df_brazil_mun <- df_codes %>% dplyr::left_join(df_brazil_mun, by="code_mun")
-grid_df       <- df_codes %>% dplyr::left_join(grid_df,       by="code_mun")
 
-rm(df_codes)
