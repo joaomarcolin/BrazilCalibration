@@ -1,0 +1,1248 @@
+---
+title: "AgriCerrado Calibration Report"
+author: "João Marcolin"
+date: "28/04/2026"
+output: html_document
+---
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE, message = FALSE, warning = FALSE, out.width='800px')
+```
+
+```{r load}
+library(magrittr)
+require(tidyverse)
+library(knitr)
+library(pander)
+library(reshape2)
+library(kableExtra)
+library(viridis)
+library(patchwork)
+library(scales)
+theme_set(theme_grey())
+
+## define auxiliary function to save figures
+# picks a folder to save the figures (if necessary, create the folder)
+if (!dir.exists("figures")) dir.create("figures")
+# auxiliary function for saving figures
+save_fig <- function(plot, name, width = 8, height = 6, dpi = 500) {
+  ggsave(paste0("figures/", name, ".png"), plot = plot, width = width, height = height, dpi = dpi)
+}
+
+## load inputs
+df_census_state <- readr::read_csv(
+                     "results/df_census_state.csv",
+                     col_types = cols(
+                       .default      = col_character(),
+                       farm_area_ha  = col_number(),
+                       n_farms       = col_number(),
+                       activity_area = col_number(),
+                       workers       = col_number()
+                       )
+                     ) %>%
+                   dplyr::filter(
+                     state %in% report_states
+                   )
+
+df_yearly_prices <- readr::read_csv(
+                      "results/df_yearly_prices.csv",
+                      col_types = cols(
+                       .default = col_number(),
+                       year     = col_character()
+                       )
+                      )
+
+df_municipalities <- readr::read_csv(
+                       "results/df_municipalities.csv",
+                       col_types = cols(
+                         .default     = col_character(),
+                         legal_amazon = col_logical(),
+                         amazon_area_km2        = col_number(),
+                         atlantic_area_km2      = col_number(),
+                         caatinga_area_km2      = col_number(),
+                         cerrado_area_km2       = col_number(),
+                         islands_area_km2       = col_number(),
+                         pampa_area_km2         = col_number(),
+                         pantanal_area_km2      = col_number(),
+                         mun_area_km2           = col_number(),
+                         mun_protected_area_km2 = col_number(),
+                         yield_C                = col_number(),
+                         yield_S_pam            = col_number(),
+                         yield_S_mb             = col_number()
+                         )
+                       ) %>%
+                     dplyr::filter(
+                       state %in% report_states
+                       )
+
+```
+
+
+################################################################################################################################################################################################################################################################################################################################################################################################################################################################################
+
+# Processing
+## IBGE Census of Agriculture
+I take state-level data on farm area, farm workers and farm economic activity from IBGE's Census of Agriculture (1996, 2006 and 2017).
+
+1. I simplify IBGE's classification of farm area groups into 4 categories: `less_than_100_ha`, `from_100_to_1000_ha`, and `more_than_1000_ha`;
+2. I simplify IBGE's classification of farm economic activity into 8 categories: `cattle` (pecuária, produção mista), `forestry` (silvicultura e exploração florestal), `perm_crop` (lavoura permanente), `temp_crop` (lavoura temporária), `veg_coal` (produção de carvão vegetal), `total` (all farms), and `other`
+3. I simplify IBGE's classification of workers' yearly work days as `less_than_180`, `more_than_180` and `total`
+
+## Yearly municipality-level and price data
+1. In `scripts_yearly/0_load_mapbiomas.R` I use Mapbiomas' [dictionary of LULC classes](https://brasil.mapbiomas.org/codigos-de-legenda/) to simplify the original 31 classes into 7 classes: "natural cover", "pasture", "perennial crops", "soybean", "temporary crops" (other than soybeans), "forestry" and "not observed";
+2. In `scripts_yearly/1_sort_amc.R` I load IBGE's AMC table, Brazil's municipality codes table and IBGE's 2024 municipality shapefiles, get the classification of AMCs that cover 1980-2010, and check which of the municipalities that exist in the 2024 shapefiles do not exist in the AMC table:
+  - Pinto Bandeira (RS), Boa Esperança do Norte (MT), Paraíso das Águas (MS), Pescaria Brava (SC), Balneário Rincão (SC) and Mojuí dos Campos (PA) exist in 2024 but are not associated with any AMC in the AMC table, and I manually assign an AMC to each of these municipalities, deciding on the basis of their emancipation history;
+  - I update Brazil's municipality codes table so that it: (a) contains every single municipality in the 2024 municipality shapefiles; and (b) every municipality is associated with an AMC code;
+  - Even so, there are two polygons in the 2024 shapefiles that are not present in the `brazil_mun` (municipality codes) table: "Lagoa dos Patos (RS)" and "Lagoa Mirim (RS)", both classified as "Área Operacional" - these are lakes, not municipalities, so their presence in the shapefiles is not a problem;
+3. In `scripts_yearly/2_calculate_theta.R` I use municipality-level data to calculate AMC-level output and area values that allow me to calculate agricultural yield at the AMC level - this is passed down to the municipality level to avoid NAs in new municipalities:
+  - I join Mapbiomas' and IBGE's (PAM, PEVS and PPM) municipality-level data in a single `MUN_data` table;
+  - I use municipalities' AMC codes to aggregate all output and area date at the AMC level, in a single `AMC_data` table;
+  - I calculate `output_X` and `area_X` at the AMC level for Cattle, Soybean and Extractive/Forestry products and calculate `theta_X` at the AMC level; since Extractive/Forestry output are monetary values, I use IPEA's IGP data to bring these to 2024 values when calculating `output_F` and `theta_F`;
+  - The AMC-level `theta_X` are assigned to each municipality through the `MUN_data` table, which still preserves municipality-level values for `output_X` and `area_X`;
+  - `theta_C` is an approximation of how many tons of beef are sold yearly by hectare of pasture; `theta_S` is the number of tons of soybean produced by hectare of soybean farming; and `theta_F` is total value of extractive/forestry activities in 2024 prices;
+4. In `scripts_yearly/3_price_series.R` I use IPEA's and Paraná's Secretary of Agriculture's data to construct time series on commodity prices, interest rate and wage levels from 1985 to 2024:
+  - I use IGP-DI index to bring all prices and wage levels to 2024 values;
+  - I manipulate `price_C` and `price_S` so that they represent the price of a ton of beef/soybean; since price data is only available for 1995-2023, I assume that prices in 1985-1995 were at the same level as in 1995 and that prices in 2024 were the same as in 2023;
+  - I use IPEA's monthly cummulative interest rate data to calculate yearly cummulative interest rate data for 1985-2024.
+
+## Spatial data
+1. In `scripts_spatial/0_reproject.R`, I reproject all the spatial data to EPSG:5880:
+  - IBGE's shapefiles (municipalities, RGIs, RGINTs, states, biomes) are all originally EPSG:4674;
+  - Mapbiomas' LULC rasters (1985, 1990, 1996, 2006, 2017, 2024) are all originally EPSG:4326;
+  - CNUC's and FUNAI's shapefiles are originally EPSG:4674;
+  - FAO GAEZ's soybean yield raster is originally EPSG:4326.
+2. In `scripts_spatial/1_reclass.R`, I reclass the values of Mapbiomas' rasters to the following values:
+  - 0 = background;
+  - 1 = natural cover: originally, codes 3, 4, 5, 6, 11, 12, 29, 32, 49, 50;
+  - 2 = pasture: originally, codes 15, 21;
+  - 3 = temporary crops: originally, codes 20, 39, 40, 41, 62;
+  - 4 = perennial crops: originally, codes 35, 46, 47, 48;
+  - 5 = forest plantation: originally, code 9;
+  - 6 = non-vegetated: originally, codes 13, 23, 24, 25, 30, 31, 33, 75.
+  - Obs:
+    - value 13 shows up in 1985, 1990 and 1996 only;
+    - value 62 shows up in 2006, 2017 and 2024 only;
+    - value 75 shows up in 2017 and 2024 only;
+    - values 0 and 13 show up in the data but are not present in Mapbiomas' classes dictionary;
+    - value 27 shows up in Mapbiomas' classes dictionary but is not present in the data.
+3. In `scripts_spatial/2_create_grid.R`, I take `param_plot_km` and divide the whole Brazilian territory in plots of equal size:
+  - Any plot with less than 75% of their area in Brazil is treated as background;
+4. In `scripts_spatial/3_grid_tenure.R`, I use overlap the cell grid with various shapefiles and assign cell-level values:
+  - IBGE's 2024 municipality shapefile is used to define `code_mun` as the municipality code of the municipality that has the most area in that plot;
+  - IBGE's biome shapefile is used to define `code_biome` as the code of the biome that has the most area in that plot (1 for Amazônia, 2 for Caatinga, 3 for Cerrado, 4 for Mata Atlântica, 5 for Pampa, 6 for Pantanal and 7 for Ilhas Oceânicas) - I get a few NAs, so I use cell centroids to determine the biome of these cells as equal to the biome of the closest cell;
+  - CNUC's and FUNAI's shapefiles are used to define `pub_area` as the % of a cell's area that is within a Conservation Unit or Indigenous Territory, and this variable is used to define `protected` as a binary variable that is equal to 1 if a cell has more than 50% of its area protected.
+5. In `scripts_spatial/4_grid_lulc.R`, I use the reclassified LULC rasters to calculate cell-level LULC variables as the % of the cell's area in each LULC class:
+  - the cell grid is overlapped with the LULC rasters (1985, 1990, 1996, 2006, 2017, 2024) and the code calculates (for each year) each cell's `areaX_YYYY`, where `X` is a LULC class and `YYYY` is a given year.
+6. In `scripts_spatial/5_grid_complete.R`, I take the cell grid with all the information from `scripts_spatial/3_grid_tenure.R` and `scripts_spatial/4_grid_lulc.R`, and I use FAO GAEZ's raster to add information on soy yield:
+  - I remove "Lagoa dos Patos" and "Lagoa Mirim" from the final grid, since these are not actual municipalities;
+  - I separate the full shapefile into one `grid_geom` object of class `sf` storing only the grid's structure (cell id and geometry) and a `grid_vars` object of class `data.frame` storing cell-level variables for multiple years.
+7. In `scripts_spatial/6_imaflora.R`, I process Imaflora's land tenure data at the state level:
+  - for each state, I overlap the state shapefile from IBGE with Imaflora's land tenure polygons, summarizing the total area in each land tenure category, as well as the area that was not classified by Imaflora.
+8. In `scripts_spatial/7_imaflora_lulc.R`, I use Imaflora's land tenure polygons and Mapbiomas' reclassified LULC rasters to summarize, for each state and land tenure class, the area in each LULC category.
+  
+# Data Outputs
+## IBGE Census of Agriculture (State-level)
+- `workers_per_ha` = tibble with state-level data:
+  - columns `state`, `activity_group`, `workers`, `area`, `year`
+  - only registers workers/hectare for cattle ranching, soybean farming and forestry
+- `farm_area_by_class` = tibble with state-level data on area of farms by area group class for 1985, 1995, 2006 and 2017
+  - area groups: `less_than_100_ha`, `from_100_to_1000_ha`, `more_than_1000_ha`
+- `farm_number_by_class` = tibble with state-level data on number of farms by area group class, area groups are the same as above
+- `farm_area_by_class_2017` = tibble with state-level data on area of farms by area group class only for 2017
+  - area groups: `less_than_100_ha`, `from_100_to_1000_ha`, `from_1000_to_2500_ha`, `from_2500_to_10000_ha`, `more_than_10000_ha`
+- `farm_number_by_class_2017` = tibble with state-level data on number of farms by area group class, area groups are the same as above
+ 
+## Yearly municipality-level and price data
+- `MUN_data` = tibble with municipality-level data:
+  - identifier columns: `code_mun`, `year`, `name_mun`, `state`, `code_micro`, `name_micro`, `code_rgi`, `name_rgi`, `code_meso`, `name_meso`, `code_rgint`, `name_rgint`, `legal_amazon`, `code_amc`;
+  - LULC variable columns: `natcover_area`, `nonveg_area`, `NA_area`, `past_area`, `soy_area`, `tempc_area`, `forestry_area`, `perec_area`;
+  - productivity variables columns: `output_X`, `area_X` and `theta_X` where `X` is either `C`, `S` or `F` - for cattle and soybean, productivity is in tons per hectare; for sustainables, productivity is in output value (reais of 2024) per hectare.
+- `yearly_prices` = tibble with yearly data:
+  - columns `year`, `interest`, `wage`, `price_C` and `price_S`.
+   
+## Spatial data
+Considering the code up until `scripts_spatial/5_grid_complete.R`:
+- `grid_geom` = sf/data.frame dividing the whole Brazil into equal plots of size `param_plot_km`:
+  - columns `cell_id` and `geometry`
+- `grid_vars` = `data.frame` storing cell-level variables for multiple years:
+  - columns `cell_id`, `code_mun`, `code_biome`, `pub_area`, `protected`, `centroid_x`, `centroid_y`, `soy_yield`, `year`, `area_ha`, `cv_V`, `cv_I_C`, `cv_I_S`, `cv_I_F`, `cv_D`, `theta_C`, `theta_S`, `theta_F`.
+
+
+
+
+# Labor intensity
+
+Using data from IBGE's Census of Agriculture (available for 1985, 1995, 2006, and 2017) at the state level, I calculate the number of workers per hectare in three sectors of activity: cattle ranching, temporary crops and forestry. Below, I provide the numbers for states with large Cerrado areas and the country as a whole:
+
+```{r labor_intensity_ha, echo=FALSE}
+
+# state-level data
+labor_intensity_state <- workers_per_ha %>%
+  dplyr::filter(state %in% report_states,
+                activity_group %in% c("cattle", "temp_crop")) %>%
+  dplyr::group_by(state, activity_group, year) %>%
+  dplyr::summarise(workers = sum(workers, na.rm=TRUE),
+                   area    = sum(area,    na.rm=TRUE)) %>%
+  dplyr::ungroup() %>%
+  dplyr::mutate(workers_ha = workers/area) %>%
+  dplyr::select(state, activity_group, year, workers_ha) %>%
+  tidyr::pivot_wider(names_from=c(activity_group,year),
+                     values_from=workers_ha)
+
+# national-level data
+labor_intensity_national <- workers_per_ha %>%
+  dplyr::filter(activity_group %in% c("cattle","temp_crop")) %>%
+  dplyr::group_by(activity_group, year) %>%
+  dplyr::summarise(workers = sum(workers, na.rm=TRUE),
+                   area    = sum(area,    na.rm=TRUE)) %>%
+  dplyr::ungroup() %>%
+  dplyr::mutate(workers_ha = workers/area,
+                state      = "Brazil") %>%
+  dplyr::select(state, activity_group, year, workers_ha) %>%
+  tidyr::pivot_wider(names_from=c(activity_group, year),
+                     values_from=workers_ha)
+
+# bind and order columns
+table_wph <- base::rbind(labor_intensity_state, labor_intensity_national) %>%
+  dplyr::select(state,
+                cattle_1995, temp_crop_1995,
+                cattle_2006, temp_crop_2006,
+                cattle_2017, temp_crop_2017)
+
+# generate table
+table_wph %>%
+  kableExtra::kable(col.names=c("Area", "Cattle", "Crops", "Cattle", "Crops", "Cattle", "Crops"),
+                    digits=4,
+                    caption=paste0("Workers per Hectare by Sector")) %>%
+  kableExtra::add_header_above(c(" "=1, "1995"=2, "2006"=2, "2017"=2)) %>%
+  kableExtra::kable_styling(bootstrap_options = c("striped", "hover", "condensed"),
+                            full_width=FALSE) %>%
+  kableExtra::row_spec(nrow(table_wph),bold=TRUE)
+
+rm(labor_intensity_state, labor_intensity_national)
+
+```
+
+Since we are working with plots much larger than 1 hectare, at the cell level we have
+
+```{r labor_intensity_plots, echo=FALSE}
+
+if (param_plot_km == 1) {
+  # get values per 100 hectares (1 sq km)
+  table_wph[,2:7] <- table_wph[,2:7]*100
+} else if (param_plot_km == 5) {
+  # get values per 2500 hectares (25 sq km)
+  table_wph[,2:7] <- table_wph[,2:7]*2500
+}
+
+# generate table
+table_wph %>%
+  kableExtra::kable(col.names=c("Area", "Cattle", "Crops", "Cattle", "Crops", "Cattle", "Crops"),
+                    digits=4,
+                    caption=paste0("Workers per Plot (",param_plot_km,"km x ",param_plot_km,"km) by Sector")) %>%
+  kableExtra::add_header_above(c(" "=1, "1995"=2, "2006"=2, "2017"=2)) %>%
+  kableExtra::kable_styling(bootstrap_options = c("striped", "hover", "condensed"),
+                            full_width=FALSE) %>%
+  kableExtra::row_spec(nrow(table_wph),bold=TRUE)
+
+rm(table_wph)
+```
+
+
+# Land Concentration
+
+Using data from IBGE's Census of Agriculture (available for 1995, 2006, and 2017) at the state level, I calculate the share of farm area in each of the following area classes:
+- less than 100 hectares;
+- from 100 to 1000 hectares;
+- more than 1000 hectares.
+This data is available at the state level, but I also provide results for the whole country
+
+```{r land_concentration_all_years, echo=FALSE}
+
+# labels size class
+size_class_labels <- c(
+  "less_than_100_ha"    = "< 100 ha",
+  "from_100_to_1000_ha" = "100–1000 ha",
+  "more_than_1000_ha"   = "> 1000 ha"
+)
+
+# helper function to compute shares from a raw area/farms table
+get_shares <- function(df, states) {
+  df <- df %>%
+    dplyr::filter(state %in% states) %>%
+    dplyr::group_by(year) %>%
+    dplyr::summarise(less_than_100_ha    = sum(less_than_100_ha,    na.rm=TRUE),
+                     from_100_to_1000_ha = sum(from_100_to_1000_ha, na.rm=TRUE),
+                     more_than_1000_ha   = sum(more_than_1000_ha,   na.rm=TRUE),
+                     total               = sum(total,               na.rm=TRUE)) %>%
+    dplyr::ungroup() %>%
+    dplyr::transmute(year,
+                     less_than_100_ha    = 100 * less_than_100_ha    / total,
+                     from_100_to_1000_ha = 100 * from_100_to_1000_ha / total,
+                     more_than_1000_ha   = 100 * more_than_1000_ha   / total)
+    return(df)
+} # closes get_share()
+
+# helper function to build wide table (states as rows, year-class as columns)
+build_wide <- function(df_list) {
+  # df_list: named list of per-state/national share tables
+  base::do.call(base::rbind, lapply(base::names(df_list), function(nm) {
+    df_list[[nm]] %>%
+      tidyr::pivot_longer(cols = less_than_100_ha:more_than_1000_ha,
+                          names_to  = "size_class",
+                          values_to = "value") %>%
+      tidyr::pivot_wider(names_from  = c(size_class, year),
+                         values_from = value) %>%
+      dplyr::mutate(area = nm)
+  })) %>%
+    dplyr::select(
+      area,
+      less_than_100_ha_1985,    from_100_to_1000_ha_1985,    more_than_1000_ha_1985,
+      less_than_100_ha_1995,    from_100_to_1000_ha_1995,    more_than_1000_ha_1995,
+      less_than_100_ha_2006,    from_100_to_1000_ha_2006,    more_than_1000_ha_2006,
+      less_than_100_ha_2017,    from_100_to_1000_ha_2017,    more_than_1000_ha_2017
+    )
+} # close build_wide()
+
+# Table 1) area shares
+area_by_state <- lapply(report_states, function(s) get_shares(farm_area_by_class, s))
+base::names(area_by_state) <- report_states
+area_national    <- list("Brazil" = get_shares(farm_area_by_class, unique(farm_area_by_class$state)))
+area_wide        <- build_wide(c(area_by_state, area_national))
+
+area_wide %>%
+  kableExtra::kable(col.names=c("Area",
+                                "<100", "100-1000", ">1000",
+                                "<100", "100-1000", ">1000",
+                                "<100", "100-1000", ">1000",
+                                "<100", "100-1000", ">1000"),
+                    digits=1,
+                    caption="Share of total farm area (%) by size class") %>%
+  kableExtra::add_header_above(c(" "=1, "1985"=3, "1995"=3, "2006"=3, "2017"=3)) %>%
+  kableExtra::kable_styling(bootstrap_options = c("stripend", "hover", "condensed"),
+                            full_width=FALSE) %>%
+  kableExtra::row_spec(nrow(area_wide),bold=TRUE)
+
+# Table 2) farm count shares
+farms_by_state <- lapply(report_states, function(s) get_shares(farm_number_by_class, s))
+base::names(farms_by_state) <- report_states
+farms_national   <- list("Brazil" = get_shares(farm_number_by_class, unique(farm_number_by_class$state)))
+farms_wide       <- build_wide(c(farms_by_state, farms_national))
+
+farms_wide %>%
+  kableExtra::kable(col.names=c("Area",
+                                "<100", "100-1000", ">1000",
+                                "<100", "100-1000", ">1000",
+                                "<100", "100-1000", ">1000",
+                                "<100", "100-1000", ">1000"),
+                    digits=1,
+                    caption="Share of total farm count (%) by size class") %>%
+  kableExtra::add_header_above(c(" "=1, "1985"=3, "1995"=3, "2006"=3, "2017"=3)) %>%
+  kableExtra::kable_styling(bootstrap_options = c("striped","hover","condensed"),
+                            full_width=FALSE) %>%
+  kableExtra::row_spec(nrow(farms_wide), bold=TRUE)
+
+# Plot 1) stacked bar chart
+# national area shares by size class (19985, 1995, 2006, 2017)
+chart_data <- farm_area_by_class %>%
+  dplyr::group_by(year) %>%
+  dplyr::summarise(less_than_100_ha    = sum(less_than_100_ha,    na.rm=TRUE),
+                   from_100_to_1000_ha = sum(from_100_to_1000_ha, na.rm=TRUE),
+                   more_than_1000_ha   = sum(more_than_1000_ha,   na.rm=TRUE),
+                   total               = sum(total,               na.rm=TRUE)) %>%
+  dplyr::ungroup() %>%
+  dplyr::transmute(year,
+                  `< 100 ha`       = 100 * less_than_100_ha    / total,
+                  `100–1000 ha`    = 100 * from_100_to_1000_ha / total,
+                  `> 1000 ha`      = 100 * more_than_1000_ha   / total) %>%
+  tidyr::pivot_longer(cols = -year,
+                      names_to  = "size_class",
+                      values_to = "share") %>%
+  dplyr::mutate(size_class = factor(size_class,
+                                    levels = c("< 100 ha", "100–1000 ha", "> 1000 ha")))
+
+g_land_concentration <- chart_data %>%
+  ggplot(aes(x=year, y=share, fill=size_class)) +
+  geom_bar(stat = "identity", position = "stack", width = 0.5) +
+  scale_fill_manual(values = c("< 100 ha"    = "#a6cee3",
+                               "100–1000 ha" = "#1f78b4",
+                               "> 1000 ha"   = "#081d58")) +
+  scale_y_continuous(limits = c(0, 100),
+                     breaks = seq(0, 100, 20),
+                     labels = function(x) paste0(x, "%")) +
+  labs(title   = "National farm area by size class",
+       x       = "Census year",
+       y       = "Share of total farmland area",
+       fill    = "Size class") +
+  theme_minimal()
+
+gridExtra::grid.arrange(g_land_concentration)
+
+save_fig(g_land_concentration,"Brazil_land_concentration")
+
+# clean up
+rm(area_by_state, area_national, area_wide,
+   farms_by_state, farms_national, farms_wide,
+   get_shares, build_wide,
+   chart_data, g_land_concentration)
+  
+```
+
+The 2017 Census of Agriculture has more classes of farm size, so we can take a more detailed look in that year:
+
+```{r land_concentration_2017, echo=FALSE}
+# correct for the "landless" category in the 2017 census
+# for the area table, we just need to remove the "landless" column (area is 0 anyway)
+area_table_2017 <- farm_area_by_class_2017 %>%
+  dplyr::select(state, less_than_100_ha, from_100_to_1000_ha, from_1000_to_2500_ha,
+                from_2500_to_10000_ha, more_than_10000_ha, total)
+# for the farm number table, we also need to recalculate the total number of farms
+farm_table_2017 <- farm_number_by_class_2017 %>%
+  dplyr::transmute(state, less_than_100_ha, from_100_to_1000_ha, from_1000_to_2500_ha, from_2500_to_10000_ha, more_than_10000_ha,
+                   total = less_than_100_ha+from_100_to_1000_ha+from_1000_to_2500_ha+from_2500_to_10000_ha+more_than_10000_ha)
+
+# helper function to compute shares from 2017 raw area/farms table
+get_shares <- function(df, states) {
+  df <- df %>%
+    dplyr::filter(state %in% states) %>%
+    dplyr::summarise(less_than_100_ha      = sum(less_than_100_ha,      na.rm=TRUE),
+                     from_100_to_1000_ha   = sum(from_100_to_1000_ha,   na.rm=TRUE),
+                     from_1000_to_2500_ha  = sum(from_1000_to_2500_ha,  na.rm=TRUE),
+                     from_2500_to_10000_ha = sum(from_2500_to_10000_ha, na.rm=TRUE),
+                     more_than_10000_ha    = sum(more_than_10000_ha,     na.rm=TRUE),
+                     total                 = sum(total,                  na.rm=TRUE)) %>%
+    dplyr::transmute(less_than_100_ha      = 100 * less_than_100_ha      / total,
+                     from_100_to_1000_ha   = 100 * from_100_to_1000_ha   / total,
+                     from_1000_to_2500_ha  = 100 * from_1000_to_2500_ha  / total,
+                     from_2500_to_10000_ha = 100 * from_2500_to_10000_ha / total,
+                     more_than_10000_ha    = 100 * more_than_10000_ha     / total)
+  return(df)
+} # closes get_shares()
+
+# helper function to build wide table (states as rows, year-class as columns)
+build_wide <- function(df, states) {
+  all_states <- unique(df$state)
+  # state rows
+  state_rows <- lapply(states, function(s) {
+    get_shares(df, s) %>%
+      dplyr::mutate(area = s, .before = 1)
+  })
+  # national row
+  national_row <- get_shares(df, all_states) %>%
+    dplyr::mutate(area = "Brazil (national)", .before = 1)
+  # bind
+  base::do.call(base::rbind, c(state_rows, list(national_row)))
+}
+
+# Table 1) area shares
+area_wide <- build_wide(area_table_2017, report_states)
+area_wide %>%
+  kableExtra::kable(col.names=c("Area","< 100 ha","100–1000 ha","1000–2500 ha","2500–10000 ha","> 10000 ha"),
+                    digits=1,
+                    caption="Share of total farm area (%) by size class (2017)") %>%
+  kableExtra::kable_styling(bootstrap_options = c("striped", "hover", "condensed"),
+                            full_width=FALSE) %>%
+  kableExtra::row_spec(nrow(area_wide),bold=TRUE)
+
+# Table 2) farm count shares
+farms_wide <- build_wide(farm_table_2017, report_states)
+farms_wide %>%
+  kableExtra::kable(col.names=c("Area","< 100 ha","100–1000 ha","1000–2500 ha","2500–10000 ha","> 10000 ha"),
+                    digits=1,
+                    caption="Share of total farm count (%) by size class (2017)") %>%
+  kableExtra::kable_styling(bootstrap_options = c("striped", "hover", "condensed"),
+                            full_width = FALSE) %>%
+  kableExtra::row_spec(nrow(farms_wide),bold=TRUE)
+
+
+# clean up
+rm(get_shares, build_wide,
+   area_wide, farms_wide)
+
+```
+
+We can use this data to get rough estimates for the values of parameters `share_smallprod`, `share_mediumprod`, `share_largeprod`, `ratio_medium_to_small`, and `ratio_large_to_small`. If the cell grid has 1km resolution, each cell has 100 hectares and we can initialize the model with values from 1985, 1995, 2006 or 2017 with no issues. If the cell grid has 5km resolution, each cell has 2500 hectares and only the 2017 data has a 1-1 relation with AgriCerrado's grid structure - we can still use the data from 1985, 1995 or 2006, but we must be aware that this is a gross approximation.
+
+```{r land_concentration_parameters, echo=FALSE}
+# helper function to compute the 5 parameters for a given set of states and year
+# small  = <100ha
+# medium = 100-1000ha
+# large  = >1000ha
+
+get_params_3class <- function(states, yr) {
+  farm_number <- farm_number_by_class %>%
+    dplyr::filter(state %in% states, year==yr) %>%
+    dplyr::summarise(small  = sum(less_than_100_ha,    na.rm=TRUE),
+                     medium = sum(from_100_to_1000_ha, na.rm=TRUE),
+                     large  = sum(more_than_1000_ha,   na.rm=TRUE),
+                     total  = sum(total,               na.rm=TRUE))
+  
+  farm_area <- farm_area_by_class %>%
+    dplyr::filter(state %in% states, year==yr) %>%
+    dplyr::summarise(small  = sum(less_than_100_ha,    na.rm=TRUE),
+                     medium = sum(from_100_to_1000_ha, na.rm=TRUE),
+                     large  = sum(more_than_1000_ha,   na.rm=TRUE))
+  
+  data.frame(share_small  = 100 * farm_number$small  / farm_number$total,
+             share_medium = 100 * farm_number$medium / farm_number$total,
+             share_large  = 100 * farm_number$large  / farm_number$total,
+             avg_small    = farm_area$small  / farm_number$small,
+             avg_medium   = farm_area$medium / farm_number$medium,
+             avg_large    = farm_area$large  / farm_number$large)
+  
+} # close get_params_3class()
+
+# helper function to compute the 5 parameters for a given set of states and year
+# small  = <2500ha
+# medium = 2500-10000ha
+# large  = >10000ha
+get_params_5class <- function(states) {
+  farm_number <- farm_table_2017 %>%
+    dplyr::filter(state %in% states) %>%
+    dplyr::summarise(small  = sum(less_than_100_ha, na.rm=TRUE) +
+                              sum(from_100_to_1000_ha, na.rm=TRUE) +
+                              sum(from_1000_to_2500_ha, na.rm=TRUE),
+                     medium = sum(from_2500_to_10000_ha, na.rm=TRUE),
+                     large  = sum(more_than_10000_ha, na.rm=TRUE),
+                     total  = sum(total, na.rm=TRUE))
+  
+  farm_area <- area_table_2017 %>%
+    dplyr::filter(state %in% states) %>%
+    dplyr::summarise(small  = sum(less_than_100_ha, na.rm=TRUE) +
+                              sum(from_100_to_1000_ha, na.rm=TRUE) +
+                              sum(from_1000_to_2500_ha, na.rm=TRUE),
+                     medium = sum(from_2500_to_10000_ha, na.rm=TRUE),
+                     large  = sum(more_than_10000_ha, na.rm=TRUE))
+  
+  data.frame(share_small  = 100 * farm_number$small  / farm_number$total,
+             share_medium = 100 * farm_number$medium / farm_number$total,
+             share_large  = 100 * farm_number$large  / farm_number$total,
+             avg_small    = farm_area$small  / farm_number$small,
+             avg_medium   = farm_area$medium / farm_number$medium,
+             avg_large    = farm_area$large  / farm_number$large)
+    
+} # closes get_params_5class()
+
+# Table 1) Land Concentration (3 classes - 1985, 1995, 2006 and 2017)
+# build wide table
+years_3class <- c("1985", "1995", "2006", "2017")
+# process data
+rows_3class <- lapply(c(report_states, "Brazil"), function(s) {
+  states <- if (s == "Brazil") unique(farm_number_by_class$state) else s
+  year_cols <- lapply(years_3class, function(yr) {
+    df <- get_params_3class(states, yr)
+    # rename columns to include year suffix before cbind
+    names(df) <- paste0(names(df), "_", yr)
+    df
+  })
+  result <- base::do.call(cbind, year_cols)
+  result$area <- if (s == "Brazil") "Brazil (national)" else s
+  result <- result %>% dplyr::select(area, dplyr::everything())
+  result
+})
+# create final df
+table_3class <- base::do.call(base::rbind, rows_3class)
+# generate table for report
+# Table 1a) Land Concentration (3 classes - 1985 and 1995)
+table_3class %>%
+  dplyr::select(area,
+                ends_with("_1985"),
+                ends_with("_1995")) %>%
+  kableExtra::kable(
+    col.names = c("Area",
+                  rep(c("Small (%)", "Medium (%)", "Large (%)",
+                        "Avg. small (ha)", "Avg. medium (ha)", "Avg. large (ha)"), 2)),
+    digits  = 1,
+    caption = "Land concentration parameters (small <100 ha, medium 100–1000 ha, large >1000 ha) — part 1/2"
+  ) %>%
+  kableExtra::add_header_above(c(" " = 1, "1985" = 6, "1995" = 6)) %>%
+  kableExtra::kable_styling(bootstrap_options = c("striped","hover","condensed"),
+                            full_width = FALSE) %>%
+  kableExtra::row_spec(nrow(table_3class), bold = TRUE)
+
+# Table 1b) Land Concentration (3 classes - 2006 and 2017)
+table_3class %>%
+  dplyr::select(area,
+                ends_with("_2006"),
+                ends_with("_2017")) %>%
+  kableExtra::kable(
+    col.names = c("Area",
+                  rep(c("Small (%)", "Medium (%)", "Large (%)",
+                        "Avg. small (ha)", "Avg. medium (ha)", "Avg. large (ha)"), 2)),
+    digits  = 1,
+    caption = "Land concentration parameters (small <100 ha, medium 100–1000 ha, large >1000 ha) — part 2/2"
+  ) %>%
+  kableExtra::add_header_above(c(" " = 1, "2006" = 6, "2017" = 6)) %>%
+  kableExtra::kable_styling(bootstrap_options = c("striped","hover","condensed"),
+                            full_width = FALSE) %>%
+  kableExtra::row_spec(nrow(table_3class), bold = TRUE)
+
+#table_3class %>%
+#  kableExtra::kable(col.names = c("Area",
+#                                  rep(c("Small (%)", "Medium (%)", "Large (%)", "Avg. small (ha)", "Avg. medium (ha)", #"Avg. large (ha)"),4)),
+#                    digits  = 1,
+#                    caption = "Land concentration parameters (small <100 ha, medium 100–1000 ha, large >1000 ha)") %>%
+#  add_header_above(c(" " = 1,
+#                     "1985" = 6, "1995" = 6,
+#                     "2006" = 6, "2017" = 6)) %>%
+#  kable_styling(bootstrap_options = c("striped","hover","condensed"), full_width = FALSE) %>%
+#  row_spec(nrow(table_3class), bold = TRUE)
+
+# Table 2) Land Concentration (3 classes - 2017)
+# process data
+rows_5class <- lapply(c(report_states, "Brazil"), function(s) {
+  states <- if (s == "Brazil") unique(farm_number_by_class_2017$state) else s
+  get_params_5class(states) %>%
+    dplyr::mutate(area = if (s == "Brazil") "Brazil (national)" else s,
+                  .before = 1)
+})
+# create final df
+table_5class <- base::do.call(base::rbind, rows_5class)
+# generate table for report
+table_5class %>%
+  kableExtra::kable(col.names=c("Area", "Small (%)", "Medium (%)", "Large (%)", "Avg. small (ha)", "Avg. medium (ha)", "Avg. large (ha)"),
+                    digits=1,
+                    caption="Land concentration parameters (small <2500 ha, medium 2500–10000 ha, large >10000 ha)") %>%
+  kableExtra::kable_styling(bootstrap_options = c("striped", "hover", "condensed"),
+                            full_width = FALSE) %>%
+  kableExtra::row_spec(nrow(table_5class), bold=TRUE)
+
+# clean up
+rm(get_params_3class, years_3class, rows_3class, table_3class,
+   get_params_5class, rows_5class, table_5class,
+   area_table_2017, farm_table_2017,
+   size_class_labels)
+
+```
+
+# Area by activity type
+Using data from IBGE's Census of Agriculture (available for 1995, 2006, and 2017) at the state level, I calculate the share of farm area in each of the following classes of economic activity:
+- cattle ranching;
+- crop farming;
+- forestry;
+- other.
+This data is available at the state level, but I also provide results for the whole country
+
+```{r area_by_activity_type, echo=FALSE}
+
+# join permanent and temporary crops
+area_by_activity2 <- area_by_activity %>%
+  dplyr::transmute(state, cattle,
+                   crop = (perm_crop+temp_crop),
+                   forestry, other, total, year)
+
+# helper function to compute shares from a raw activity/area table
+get_shares <- function(df, states) {
+  df <- df %>%
+    dplyr::filter(state %in% states) %>%
+    dplyr::group_by(year) %>%
+    dplyr::summarise(cattle   = sum(cattle,   na.rm=TRUE),
+                     crop     = sum(crop,     na.rm=TRUE),
+                     forestry = sum(forestry, na.rm=TRUE),
+                     other    = sum(other,    na.rm=TRUE),
+                     total    = sum(total,    na.rm=TRUE)) %>%
+    dplyr::ungroup() %>%
+    dplyr::transmute(year,
+                     cattle   = 100 * cattle   / total,
+                     crop     = 100 * crop     / total,
+                     forestry = 100 * forestry / total,
+                     other    = 100 * other    / total)
+    return(df)
+} # closes get_share()
+
+# helper function to build wide table (states as rows, year-class as columns)
+build_wide <- function(df_list) {
+  # df_list: named list of per-state/national share tables
+  base::do.call(base::rbind, lapply(base::names(df_list), function(nm) {
+    df_list[[nm]] %>%
+      tidyr::pivot_longer(cols = cattle:other,
+                          names_to  = "activity_class",
+                          values_to = "value") %>%
+      tidyr::pivot_wider(names_from  = c(activity_class, year),
+                         values_from = value) %>%
+      dplyr::mutate(area = nm)
+  })) %>%
+    dplyr::select(
+      area,
+      cattle_1995, crop_1995, forestry_1995, other_1995,
+      cattle_2006, crop_2006, forestry_2006, other_2006,
+      cattle_2017, crop_2017, forestry_2017, other_2017)
+} # close build_wide()
+
+# Table 1) area shares
+activity_area_by_state <- lapply(report_states, function(s) get_shares(area_by_activity2, s))
+base::names(activity_area_by_state) <- report_states
+area_national    <- list("Brazil" = get_shares(area_by_activity2, unique(area_by_activity2$state)))
+area_wide        <- build_wide(c(activity_area_by_state, area_national))
+
+area_wide %>%
+  kableExtra::kable(col.names=c("Area",
+                                "Cattle", "Crop", "Forestry", "Other",
+                                "Cattle", "Crop", "Forestry", "Other",
+                                "Cattle", "Crop", "Forestry", "Other"),
+                    digits=1,
+                    caption="Share of total farm area (%) by activity class") %>%
+  kableExtra::add_header_above(c(" "=1, "1995"=4, "2006"=4, "2017"=4)) %>%
+  kableExtra::kable_styling(bootstrap_options = c("stripend", "hover", "condensed"),
+                            full_width=FALSE) %>%
+  kableExtra::row_spec(nrow(area_wide),bold=TRUE)
+
+# Plot 1) stacked bar chart
+# national area shares by size class (19985, 1995, 2006, 2017)
+chart_data <- area_by_activity2 %>%
+  dplyr::group_by(year) %>%
+  dplyr::summarise(cattle   = sum(cattle,   na.rm=TRUE),
+                   crop     = sum(crop,     na.rm=TRUE),
+                   forestry = sum(forestry, na.rm=TRUE),
+                   other    = sum(other,    na.rm=TRUE),
+                   total    = sum(total,    na.rm=TRUE)) %>%
+  dplyr::ungroup() %>%
+  dplyr::transmute(year,
+                   Cattle   = 100 * cattle   / total,
+                   Crop     = 100 * crop     / total,
+                   Forestry = 100 * forestry / total,
+                   Other    = 100 * other    / total ) %>%
+  tidyr::pivot_longer(cols = -year,
+                      names_to  = "activity_class",
+                      values_to = "share") %>%
+  dplyr::mutate(activity_class = factor(activity_class,
+                                        levels = c("Cattle", "Crop", "Forestry", "Other")))
+
+g_area_by_type <- chart_data %>%
+  ggplot(aes(x=year, y=share, fill=activity_class)) +
+  geom_bar(stat = "identity", position = "stack", width = 0.5) +
+  scale_fill_manual(values = c("Cattle"   = "#edde8e",
+                               "Crop"     = "#C27BA0",
+                               "Forestry" = "#1f8d49",
+                               "Other"    = "#d4271e")) +
+  scale_y_continuous(limits = c(0, 100),
+                     breaks = seq(0, 100, 20),
+                     labels = function(x) paste0(x, "%")) +
+  labs(title   = "National farm area by activity class",
+       x       = "Census year",
+       y       = "Share of total farmland area",
+       fill    = "Activity class") +
+  theme_minimal()
+
+gridExtra::grid.arrange(g_area_by_type)
+
+save_fig(g_area_by_type,"Brazil_farmland_by_activity_census")
+
+# clean up
+rm(area_by_activity2, get_shares, build_wide, activity_area_by_state, 
+   area_national, area_wide, chart_data, g_area_by_type)
+
+```
+
+# Yearly data
+## National level
+Using:
+- Mapbiomas' yearly municipality-level LULC data;
+- IBGE's PAM, PPM and PEVS yearly municipality-level surveys on Brazilian farms;
+- Paraná's Secretary of Agriculture yearly commodity prices data;
+- IPEA's yearly data on the base interest rate and the national minimum wage level.
+I was able to recreate the yearly behavior of a few variables of interest. At this point, these values are presented at the national level, but we can always pick a subset of municipalities and plot the local tendencies of all of these variables - except, of course, commodity prices, interest rates and minimum wage.
+
+```{r yearly_data_plot_function, echo=FALSE}
+
+yearly_prices$year <- as.numeric(yearly_prices$year)
+
+yearly_data <- MUN_data %>%
+  dplyr::select(year,
+                mb_natcover_area, mb_nonveg_area, mb_NA_area, mb_past_area, mb_soy_area, 
+                mb_tempc_area, mb_forestry_area, mb_perec_area, output_C, output_S, output_F,
+                area_C, area_S_mb, area_S_pam, area_F) %>%
+  dplyr::group_by(year) %>%
+  dplyr::summarise(across(everything(), ~sum(.x,na.rm=TRUE))) %>%
+  dplyr::mutate(yield_C     = output_C/area_C,
+                yield_S_mb  = output_S/area_S_mb,
+                yield_S_pam = output_S/area_S_pam,
+                yield_F     = output_F/area_F) %>%
+  dplyr::left_join(yearly_prices, by="year")
+# output_F is 0 in 1985 because there was no PEVS that year
+# I substitute yield_F in 1985 with its value in 1986
+yearly_data$yield_F[yearly_data$year==1985] <- yearly_data$yield_F[yearly_data$year==1986]
+# yield_S_mb is way too high in 1985
+yearly_data$yield_S_mb[yearly_data$year==1985] <- yearly_data$yield_S_mb[yearly_data$year==1986]
+# year column should be numeric for making plots
+yearly_data$year <- as.numeric(yearly_data$year)
+# auxiliary function to plot yearly values (line plot)
+plot_var <- function(df, var, var_name, title) {
+  ggplot(df, aes(x=year, y=.data[[var]])) +
+    geom_line() +
+    labs(title=title, x="Year", y=var_name) +
+    theme_minimal()
+}
+
+```
+
+
+```{r yearly_theta, echo=FALSE}
+
+plot_yield_C <- plot_var(yearly_data, "yield_C", "tons per ha.", "Beef yield (Brazil)") +
+  geom_smooth(method = "loess", se=FALSE) # add trend line
+plot_yield_S_mb <- plot_var(yearly_data, "yield_S_mb", "tons per ha.", "Soybean yield (Brazil, mb)") +
+  geom_smooth(method = "loess", se=FALSE) # add trend line
+plot_yield_S_pam <- plot_var(yearly_data, "yield_S_pam", "tons per ha.", "Soybean yield (Brazil, pam)") +
+  geom_smooth(method = "loess", se=FALSE) # add trend line
+
+(plot_yield_C | plot_yield_S_mb | plot_yield_S_pam)
+
+save_fig(plot_yield_C,    "Brazil_yield_C")
+save_fig(plot_yield_S_mb, "Brazil_yield_S_mb")
+save_fig(plot_yield_S_pam,"Brazil_yield_S_pam")
+
+rm(plot_yield_C, plot_yield_S_mb, plot_yield_S_pam)
+```
+
+```{r yearly_prices, echo=FALSE}
+yearly_data2 <- yearly_data %>% 
+  dplyr::filter(year>=1996) %>%
+  dplyr::mutate(price_C = 1000*price_C, # price comes in 1000 BRL per ton
+                price_S = 1000*price_S) # price comes in 1000 BRL per ton
+
+plot_interest <- plot_var(yearly_data2, "interest", "interest", "Cumulative yearly interest rate") +
+  geom_smooth(method = "loess", se=FALSE) # add trend line
+plot_wage     <- plot_var(yearly_data2, "wage",     "min. wage", "National minimum wage") +
+  geom_smooth(method = "loess", se=FALSE) # add trend line
+plot_price_C  <- plot_var(yearly_data2, "price_C",  "BRL per ton", "Beef price (base=2024)") +
+  geom_smooth(method = "loess", se=FALSE) # add trend line
+plot_price_S  <- plot_var(yearly_data2, "price_S",  "BRL per ton", "Soybean price (base=2024)") +
+  geom_smooth(method = "loess", se=FALSE) # add trend line
+
+(plot_interest | plot_wage) / (plot_price_C | plot_price_S)
+save_fig(plot_interest, "Brazil_interest")
+save_fig(plot_wage,     "Brazil_wage")
+save_fig(plot_price_C,  "Brazil_price_C")
+save_fig(plot_price_S,  "Brazil_price_S")
+
+rm(plot_interest, plot_wage, plot_price_C, plot_price_S)
+```
+
+```{r yearly_LULC, echo=FALSE}
+
+# (1) first I generate a plot with all LULC categories from yearly_data
+yearly_LULC <- yearly_data %>%
+  dplyr::select(year, mb_natcover_area, mb_nonveg_area, mb_NA_area, mb_past_area, 
+                mb_soy_area, mb_tempc_area, mb_forestry_area, mb_perec_area) %>%
+  dplyr::mutate(total_area = mb_natcover_area + mb_nonveg_area + mb_NA_area + mb_past_area +
+                             mb_soy_area + mb_tempc_area + mb_forestry_area + mb_perec_area) %>%
+  dplyr::transmute(year,
+                   mb_natcover_area = 100*mb_natcover_area/total_area,
+                   mb_nonveg_area   = 100*mb_nonveg_area/total_area,
+                   mb_NA_area       = 100*mb_NA_area/total_area,
+                   mb_past_area     = 100*mb_past_area/total_area,
+                   mb_soy_area      = 100*mb_soy_area/total_area,
+                   mb_tempc_area    = 100*mb_tempc_area/total_area,
+                   mb_forestry_area = 100*mb_forestry_area/total_area,
+                   mb_perec_area    = 100*mb_perec_area/total_area)
+
+lulc_order <- c("mb_natcover_area", "mb_forestry_area", "mb_past_area",
+                "mb_soy_area", "mb_tempc_area", "mb_perec_area", "mb_nonveg_area", "mb_NA_area")
+
+plot_LULC1 <- yearly_LULC %>%
+  tidyr::pivot_longer(cols=-year, names_to="category",values_to="value") %>%
+  dplyr::mutate(category=factor(category,levels=lulc_order)) %>%
+  ggplot(aes(x=year, y=value, fill=category)) +
+  geom_area() +
+ scale_fill_manual(
+    values = c(
+      "mb_natcover_area" = "#1f8d49",
+      "mb_forestry_area" = "#7a5900",
+      "mb_past_area"     = "#edde8e",
+      "mb_soy_area"      = "#f5b3c8",
+      "mb_tempc_area"    = "#C27BA0",
+      "mb_perec_area"    = "#d082de",
+      "mb_nonveg_area"   = "#d4271e",
+      "mb_NA_area"       = "#838B8B"
+    ),
+    labels = c(
+      "mb_natcover_area" = "Natural cover",
+      "mb_forestry_area" = "Forestry",
+      "mb_past_area"     = "Pasture",
+      "mb_soy_area"      = "Soybean",
+      "mb_tempc_area"    = "Temporary crops",
+      "mb_perec_area"    = "Perennial crops",
+      "mb_nonveg_area"   = "Non-vegetated",
+      "mb_NA_area"       = "Not observed"
+    )
+  ) +
+  labs(title="Yearly LULC shares",
+       x="Year",
+       y="Share of total area (%)",
+       fill="Land use category") +
+  theme_minimal()
+
+
+# (2) I also generate a simplified LULC plot, containing only the LULC categories present in the model
+yearly_LULC2 <- yearly_LULC %>%
+  dplyr::transmute(year,
+                   veg = mb_natcover_area + mb_forestry_area,
+                   cattle = mb_past_area,
+                   crop = mb_soy_area + mb_tempc_area + mb_perec_area,
+                   abandoned = mb_nonveg_area + mb_NA_area)
+
+lulc_order2 <- c("veg", "cattle", "crop", "abandoned")
+
+plot_LULC2 <- yearly_LULC2 %>%
+  tidyr::pivot_longer(cols=-year, names_to="category",values_to="value") %>%
+  dplyr::mutate(category=factor(category,levels=lulc_order2)) %>%
+  ggplot(aes(x=year, y=value, fill=category)) +
+  geom_area() +
+ scale_fill_manual(
+    values = c(
+      "veg"       = "#1f8d49",
+      "cattle"    = "#edde8e",
+      "crop"      = "#C27BA0",
+      "abandoned" = "#d4271e"
+    ),
+    labels = c(
+      "veg"       = "Vegetation",
+      "cattle"    = "Pasture",
+      "crop"      = "Crops",
+      "abandoned" = "Non-vegetated"
+    )
+  ) +
+  labs(title="Yearly LULC shares (simplified)",
+       x="Year",
+       y="Share of total area (%)",
+       fill="Land use category") +
+  theme_minimal()
+
+# show plots
+(plot_LULC1 | plot_LULC2)
+save_fig(plot_LULC1,"Brazil_lulc_8classes")
+save_fig(plot_LULC2,"Brazil_lulc_4classes")
+
+# clean up
+rm(yearly_data2, yearly_LULC, yearly_LULC2, lulc_order, lulc_order2, yearly_data, plot_var,
+   plot_LULC1, plot_LULC2)
+
+```
+## State level
+
+```{r yearly_theta_by_state, echo=FALSE}
+# summarise data by state-year and calculate theta_C and theta_S
+yearly_state <- MUN_data %>%
+  dplyr::filter(state %in% report_states) %>%
+  dplyr::group_by(state, year) %>%
+  dplyr::summarise(output_C   = sum(output_C,   na.rm=TRUE),
+                   output_S   = sum(output_S,   na.rm=TRUE),
+                   area_C     = sum(area_C,     na.rm=TRUE),
+                   area_S_mb  = sum(area_S_mb,  na.rm=TRUE),
+                   area_S_pam = sum(area_S_pam, na.rm=TRUE)) %>%
+  dplyr::ungroup() %>%
+  dplyr::mutate(yield_C     = output_C / area_C,
+                yield_S_mb  = output_S / area_S_mb,
+                yield_S_pam = output_S / area_S_pam)
+
+# plot yield_C
+plot_yield_C_state <- ggplot(yearly_state, aes(x=year, y=yield_C, color=state)) +
+  geom_line() +
+  labs(title="Beef yield", x="Year", y="tons/ha", color="State") +
+  theme_minimal()
+
+# plot yield_S_mb
+plot_yield_S_mb_state <- ggplot(yearly_state, aes(x=year, y=yield_S_mb, color=state)) +
+  geom_line() +
+  labs(title="Soybean yield (mb)", x="Year", y="tons/ha", color="State") +
+  theme_minimal()
+
+# plot yield_S_pam
+plot_yield_S_pam_state <- ggplot(yearly_state, aes(x=year, y=yield_S_pam, color=state)) +
+  geom_line() +
+  labs(title="Soybean yield (pam)", x="Year", y="tons/ha", color="State") +
+  theme_minimal()
+
+(plot_yield_C_state | plot_yield_S_mb_state | plot_yield_S_pam_state)
+save_fig(plot_yield_C_state,    "states_yield_C")
+save_fig(plot_yield_S_mb_state, "states_yield_S_mb")
+save_fig(plot_yield_S_pam_state,"states_yield_S_pam")
+
+rm(yearly_state, plot_yield_C_state, plot_yield_S_mb_state, plot_yield_S_pam_state)
+```
+
+```{r mun_yield_distribution, echo=FALSE, fig.width=14, fig.height=8}
+# default fig.width=7, making the figure wider must make it easier to plot the scales
+#
+## uses parameters
+#min_area_C <- 10000
+#min_area_S <- 10000
+
+# municipality-level yields
+mun_yields <- MUN_data %>%
+  dplyr::filter(state %in% report_states,
+                year == param_year) %>%
+  dplyr::filter(!is.na(yield_C) | !is.na(yield_S_mb) | !is.na(yield_S_pam))
+
+# plot beef yield distribution
+plot_box_C <- ggplot(mun_yields %>% dplyr::filter(!is.na(yield_C)),
+                     aes(x = reorder(state, yield_C, FUN=median), y = yield_C)) +
+  geom_boxplot(outlier.size=0.8, fill="#edde8e") +
+  coord_flip() +
+  labs(title  = paste0("Beef yield distribution by state (",param_year,")"),
+       subtitle = paste0("Municipalities with pasture area >= ", min_area_C, " ha"),
+       x = NULL, y = "tons / ha") +
+  theme_minimal()
+
+# plot soybean yield distribution (area from mapbiomas)
+plot_box_S_mb <- ggplot(mun_yields %>% dplyr::filter(!is.na(yield_S_mb)),
+                     aes(x = reorder(state, yield_S_mb, FUN=median), y = yield_S_mb)) +
+  geom_boxplot(outlier.size=0.8, fill="#C27BA0") +
+  coord_flip() +
+  labs(title  = paste0("Soybean yield distribution by state (",param_year,", mb)"),
+       subtitle = paste0("Municipalities with soy area >= ", min_area_S, " ha"),
+       x = NULL, y = "tons / ha") +
+  theme_minimal()
+
+# plot soybean yield distribution (area from pam)
+plot_box_S_pam <- ggplot(mun_yields %>% dplyr::filter(!is.na(yield_S_pam)),
+                     aes(x = reorder(state, yield_S_pam, FUN=median), y = yield_S_pam)) +
+  geom_boxplot(outlier.size=0.8, fill="#C27BA0") +
+  coord_flip() +
+  labs(title  = paste0("Soybean yield distribution by state (",param_year,", pam)"),
+       subtitle = paste0("Municipalities with soy area >= ", min_area_S, " ha"),
+       x = NULL, y = "tons / ha") +
+  theme_minimal()
+
+(plot_box_C | plot_box_S_mb | plot_box_S_pam)
+save_fig(plot_box_C,    "states_yield_C_box_plot")
+save_fig(plot_box_S_mb, "states_yield_S_mb_box_plot")
+save_fig(plot_box_S_pam,"states_yield_S_pam_box_plot")
+
+rm(plot_box_C, plot_box_S_mb, plot_box_S_pam)
+```
+
+
+```{r mun_yield_distribution_years, echo=FALSE}
+# get municipality-level yield_C and yield_S
+mun_yields_years <- MUN_data %>%
+  dplyr::filter(state %in% report_states,
+                year  %in% c(1985,1995,2006,2017))
+
+# plot dispersion of yield_C
+plot_box_C_years <- ggplot(mun_yields_years %>% dplyr::filter(!is.na(yield_C)),
+                           aes(x = factor(year), y = yield_C, fill = factor(year))) +
+  geom_boxplot(outlier.size=0.5) +
+  scale_fill_manual(values=c("1985"="#a38b00","1995"="#c9b84a","2006"="#e0cf7a","2017"="#edde8e"),
+                    guide="none") +
+  facet_wrap(~state, ncol=4, scales="free_y") +
+  labs(title    = "Beef yield distribution across years",
+       subtitle = paste0("Municipalities with pasture area >= ", min_area_C, " ha"),
+       x="Year", y="tons / ha") +
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle=45, hjust=1))
+
+# plot dispersion of yield_S_mb
+plot_box_S_mb_years <- ggplot(mun_yields_years %>% dplyr::filter(!is.na(yield_S_mb)),
+                           aes(x = factor(year), y = yield_S_mb, fill = factor(year))) +
+  geom_boxplot(outlier.size=0.5) +
+  scale_fill_manual(values=c("1985"="#7b3b63","1995"="#9e5c84","2006"="#b56d95","2017"="#C27BA0"),
+                    guide="none") +
+  facet_wrap(~state, ncol=4, scales="free_y") +
+  labs(title    = "Soybean yield (mb) distribution across years",
+       subtitle = paste0("Municipalities with soy area >= ", min_area_S, " ha"),
+       x="Year", y="tons / ha") +
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle=45, hjust=1))
+
+# plot dispersion of yield_S_pam
+plot_box_S_pam_years <- ggplot(mun_yields_years %>% dplyr::filter(!is.na(yield_S_pam)),
+                           aes(x = factor(year), y = yield_S_pam, fill = factor(year))) +
+  geom_boxplot(outlier.size=0.5) +
+  scale_fill_manual(values=c("1985"="#7b3b63","1995"="#9e5c84","2006"="#b56d95","2017"="#C27BA0"),
+                    guide="none") +
+  facet_wrap(~state, ncol=4, scales="free_y") +
+  labs(title    = "Soybean yield (pam) distribution across years",
+       subtitle = paste0("Municipalities with soy area >= ", min_area_S, " ha"),
+       x="Year", y="tons / ha") +
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle=45, hjust=1))
+
+plot_box_C_years
+plot_box_S_mb_years
+plot_box_S_pam_years
+
+save_fig(plot_box_C_years,    "states_theta_C_box_plot_yearly")
+save_fig(plot_box_S_mb_years, "states_theta_S_mb_box_plot_yearly")
+save_fig(plot_box_S_pam_years,"states_theta_S_pam_box_plot_yearly")
+
+rm(mun_yields, mun_yields_years,
+   plot_box_C_years, plot_box_S_mb_years, plot_box_S_pam_years)
+```
+
+
+```{r yearly_LULC_by_state, echo=FALSE}
+# get lulc variables for state-year pairs
+lulc_state <- MUN_data %>%
+  dplyr::filter(state %in% report_states) %>%
+  dplyr::group_by(state,year) %>%
+  dplyr::summarise(veg=sum(mb_natcover_area + mb_forestry_area, na.rm=TRUE),
+                   cattle=sum(mb_past_area, na.rm=TRUE),
+                   crop=sum(mb_soy_area + mb_tempc_area + mb_perec_area, na.rm=TRUE),
+                   abandoned=sum(mb_nonveg_area + mb_NA_area, na.rm=TRUE)) %>%
+  dplyr::ungroup() %>%
+  dplyr::mutate(total=veg+cattle+crop+abandoned,
+                veg=veg/total,
+                cattle=cattle/total,
+                crop=crop/total,
+                abandoned=abandoned/total) %>%
+  tidyr::pivot_longer(cols=c(veg,cattle,crop,abandoned),
+                      names_to="category", values_to="share") %>%
+  dplyr::mutate(category=factor(category, levels=c("veg","cattle","crop","abandoned")))
+
+# plot
+plot_lulc_state <- ggplot(lulc_state, aes(x=year, y=share, fill=category)) +
+  geom_area() +
+  scale_fill_manual(
+    values = c("veg"="#1f8d49", "cattle"="#edde8e",
+               "crop"="#C27BA0", "abandoned"="#d4271e"),
+    labels = c("veg"="Vegetation", "cattle"="Pasture",
+               "crop"="Crops",     "abandoned"="Non-vegetated")
+  ) +
+  scale_y_continuous(labels=scales::percent) +
+  facet_wrap(~state, ncol=4) +
+  labs(title="Yearly LULC shares by Cerrado state (simplified)",
+       x="Year", y="Share of total area", fill="Category") +
+  theme_minimal() +
+  theme(axis.text.x=element_text(angle=45, hjust=1))
+
+plot_lulc_state
+save_fig(plot_lulc_state,"states_lulc")
+
+rm(lulc_state, plot_lulc_state)
+
+```
+
+# Spatial data
+Using:
+- Mapbiomas' LULC rasters for 1985, 1990, 1996, 2006, 2017 and 2024;
+- IBGE's, CNUC's and FUNAI's shapefiles.
+I was able to partition Brazil in 5km x 5km plots, each of them associated with a few variables of interest. Below, I show a few results only for 1985 and restricted to states with significant Cerrado area. The data is available for the whole country for the years 1985, 1990, 1996, 2006, 2017 and 2024.
+
+```{r spatial_data, echo=FALSE, fig.width=14, fig.height=12}
+# default fig.width=7, making the figure wider must make it easier to plot the scales
+#
+# this sections needs param_year and report_states
+
+# filter grid_vars to the selected year
+grid_vars2 <- grid_vars %>%
+  dplyr::filter(year == param_year) %>%
+  dplyr::select(-year) %>%
+  dplyr::mutate(cv_I = cv_I_C + cv_I_S + cv_I_F)
+
+# identify cells belonging to the selected states
+mun_codes_spatial <- MUN_data %>%
+  dplyr::filter(state %in% report_states) %>%
+  dplyr::pull(code_mun) %>%
+  base::unique()
+
+grid_vars2 <- grid_vars2 %>%
+  dplyr::filter(code_mun %in% mun_codes_spatial)
+
+# join geometry and variables
+grid_sf <- grid_geom %>%
+  dplyr::filter(cell_id %in% grid_vars2$cell_id) %>%
+  dplyr::left_join(grid_vars2, by="cell_id")
+
+# shared map theme — removes axis clutter for spatial figures
+theme_map <- theme_void() +
+  theme(legend.position  = "right",
+        legend.key.height = unit(1.2, "cm"),
+        legend.key.width  = unit(0.4, "cm"),
+        plot.title        = element_text(size=10, face="bold", hjust=0.5),
+        plot.margin       = margin(2,2,2,2))
+
+# (1) cv_V — natural vegetation cover
+# colorblind-safe: viridis "viridis" (yellow-green-blue)
+fig_cv_V <- ggplot(grid_sf) +
+  geom_sf(aes(fill=cv_V), color=NA) +
+  scale_fill_viridis_c(option="viridis", limits=c(0,1),
+                       labels=scales::percent, name="") +
+  labs(title="Natural vegetation (cv_V)") +
+  theme_map
+
+# (2) cv_I — farming area
+# colorblind-safe: viridis "rocket" (white-orange-dark red)
+fig_cv_I <- ggplot(grid_sf) +
+  geom_sf(aes(fill=cv_I), color=NA) +
+  scale_fill_viridis_c(option="rocket", direction=-1, limits=c(0,1),
+                       labels=scales::percent, name="") +
+  labs(title="Farming area (cv_I)") +
+  theme_map
+
+# (3) cv_D — deforested abandoned area
+# colorblind-safe: viridis "mako" (white-teal-dark blue)
+fig_cv_D <- ggplot(grid_sf) +
+  geom_sf(aes(fill=cv_D), color=NA) +
+  scale_fill_viridis_c(option="mako", direction=-1, limits=c(0,1),
+                       labels=scales::percent, name="") +
+  labs(title="Abandoned area (cv_D)") +
+  theme_map
+
+# (4) yield_C — beef yield
+# sqrt transform reduces dominance of high-yield outliers
+fig_yield_C <- ggplot(grid_sf) +
+  geom_sf(aes(fill=yield_C), color=NA) +
+  scale_fill_viridis_c(option="plasma", trans="sqrt",
+                       name="tons/ha", na.value="grey90") +
+  labs(title="Beef yield (tons/ha)") +
+  theme_map
+
+# (5) yield_S_mb — soybean yield (area from mapbiomas)
+fig_yield_S_mb <- ggplot(grid_sf) +
+  geom_sf(aes(fill=yield_S_mb), color=NA) +
+  scale_fill_viridis_c(option="plasma", trans="sqrt",
+                       name="tons/ha", na.value="grey90") +
+  labs(title="Soybean yield (tons/ha, mb)") +
+  theme_map
+
+# (5) yield_S_pam — soybean yield (area from PAM)
+fig_yield_S_pam <- ggplot(grid_sf) +
+  geom_sf(aes(fill=yield_S_pam), color=NA) +
+  scale_fill_viridis_c(option="plasma", trans="sqrt",
+                       name="tons/ha", na.value="grey90") +
+  labs(title="Soybean yield (tons/ha, pam)") +
+  theme_map
+
+# (6) yield_S_fao — soybean yield (from FAO)
+fig_yield_S_fao <- ggplot(grid_sf) +
+  geom_sf(aes(fill=FAO_soy_yield), color=NA) +
+  scale_fill_viridis_c(option="plasma", trans="sqrt",
+                       name="tons/ha", na.value="grey90") +
+  labs(title="Soybean yield (tons/ha, fao)") +
+  theme_map
+
+# (7) protected — binary protected area flag
+# two-color discrete scale: grey = unprotected, teal = protected
+fig_protected <- ggplot(grid_sf) +
+  geom_sf(aes(fill=factor(protected)), color=NA) +
+  scale_fill_manual(values=c("0"="#d9d9d9", "1"="#009E73"),
+                    labels=c("0"="No", "1"="Yes"),
+                    name="") +
+  labs(title="Protected area") +
+  theme_map
+
+# arrange in 2x3 grid
+(fig_cv_V | fig_cv_I | fig_cv_D) /
+(fig_yield_S_mb | fig_yield_S_pam | fig_yield_S_fao) /
+(fig_yield_C | fig_protected) #+
+  #patchwork::plot_layout(widths=c(1,1,1))
+
+save_fig(fig_cv_V,        "spatial_fig_cv_V")
+save_fig(fig_cv_I,        "spatial_fig_cv_I")
+save_fig(fig_cv_D,        "spatial_fig_cv_D")
+save_fig(fig_yield_C,     "spatial_fig_yield_C")
+save_fig(fig_yield_S_mb,  "spatial_fig_yield_S_mb")
+save_fig(fig_yield_S_pam, "spatial_fig_yield_S_pam")
+save_fig(fig_yield_S_fao, "spatial_fig_yield_S_fao")
+save_fig(fig_protected,   "spatial_fig_protected")
+
+# clean up
+rm(grid_sf, grid_vars2, mun_codes_spatial,
+   theme_map, fig_cv_V, fig_cv_I, fig_cv_D,
+   fig_yield_C, fig_yield_S_mb, fig_yield_S_pam,
+   fig_yield_S_fao, fig_protected)
+
+rm(save_fig)
+```
+

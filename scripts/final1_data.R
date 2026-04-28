@@ -128,13 +128,22 @@ df_1995 <- summarise_group_f("1995")
 df_2006 <- summarise_group_f("2006")
 df_2017 <- summarise_group_f("2017")
 
-# join in a single data.frame and clean up
-df_municipalities <- rbind(df_1985, df_1995, df_2006, df_2017)
-rm(df_1985, df_1995, df_2006, df_2017,
+# join in a single data.frame
+df_mun <- rbind(df_1985, df_1995, df_2006, df_2017)
+
+# add state column
+df_municipalities <- df_brazil_mun %>%
+  dplyr::select(code_mun:legal_amazon) %>%
+  dplyr::left_join(
+    dplyr::select(df_mun,-legal_amazon),
+    by = join_by(code_mun, group_1985, group_1995, group_2006, group_2017)
+    )
+
+# clean up
+rm(df_1985, df_1995, df_2006, df_2017, df_mun,
    df_brazil_mun, df_yearly_mun, df_codes,
    summarise_group_f)
 
-# (3) deal with NA yield values -------------------------------------------
 
 
 

@@ -15,25 +15,25 @@ df_grid <- readr::read_csv(
                         )
                     )
 
-df_municipalities <- readr::read_csv(
-                       "results/df_municipalities.csv",
-                       col_types = cols(
-                         .default               = col_character(),
-                         legal_amazon           = col_logical(),
-                         amazon_area_km2        = col_number(),
-                         atlantic_area_km2      = col_number(),
-                         caatinga_area_km2      = col_number(),
-                         cerrado_area_km2       = col_number(),
-                         islands_area_km2       = col_number(),
-                         pampa_area_km2         = col_number(),
-                         pantanal_area_km2      = col_number(),
-                         mun_area_km2           = col_number(),
-                         mun_protected_area_km2 = col_number(),
-                         yield_C                = col_number(),
-                         yield_S_pam            = col_number(),
-                         yield_S_mb             = col_number()
-                         )
-                       )
+#df_municipalities <- readr::read_csv(
+#                       "results/df_municipalities.csv",
+#                       col_types = cols(
+#                         .default               = col_character(),
+#                         legal_amazon           = col_logical(),
+#                         amazon_area_km2        = col_number(),
+#                         atlantic_area_km2      = col_number(),
+#                         caatinga_area_km2      = col_number(),
+#                         cerrado_area_km2       = col_number(),
+#                         islands_area_km2       = col_number(),
+#                         pampa_area_km2         = col_number(),
+#                         pantanal_area_km2      = col_number(),
+#                         mun_area_km2           = col_number(),
+#                         mun_protected_area_km2 = col_number(),
+#                         yield_C                = col_number(),
+#                         yield_S_pam            = col_number(),
+#                         yield_S_mb             = col_number()
+#                         )
+#                       )
 
 #sf::st_write(sf_grid,     paste0("data_outputs/1_cell_grid/6_complete_grid/sf_",set_name,"_grid_",param_plot_km,"km.shp"), delete_layer=TRUE)
 
@@ -41,7 +41,7 @@ df_municipalities <- readr::read_csv(
 # (2) join data -----------------------------------------------------------
 df_mun_data <- df_municipalities %>%
   dplyr::select(
-    code_mun, group, year, legal_amazon,
+    code_mun, state, group, year, legal_amazon,
     yield_C:yield_S_mb
     ) %>%
   dplyr::filter(
@@ -55,7 +55,7 @@ df_grid <- df_grid %>%
     ) %>%
   dplyr::select(
     cell_id, centroid_x, centroid_y,
-    code_mun, code_biome, legal_amazon, protected,
+    code_mun, state, code_biome, legal_amazon, protected,
     group, year,
     cv_V, cv_I_C, cv_I_S, cv_I_F, cv_D,
     yield_C, yield_S_pam, yield_S_mb,
