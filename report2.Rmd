@@ -1,0 +1,302 @@
+---
+title: "AgriCerrado Calibration Report"
+author: "João Marcolin"
+date: "28/04/2026"
+output: html_document
+---
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE, message = FALSE, warning = FALSE, out.width='800px')
+```
+
+```{r load}
+library(magrittr)
+require(tidyverse)
+library(knitr)
+library(pander)
+library(reshape2)
+library(kableExtra)
+library(viridis)
+library(patchwork)
+library(scales)
+theme_set(theme_grey())
+
+## define auxiliary function to save figures
+# picks a folder to save the figures (if necessary, create the folder)
+if (!dir.exists("figures")) dir.create("figures")
+# auxiliary function for saving figures
+save_fig <- function(plot, name, width = 8, height = 6, dpi = 500) {
+  ggsave(paste0("figures/", name, ".png"), plot = plot, width = width, height = height, dpi = dpi)
+}
+
+## load inputs
+df_census_state <- readr::read_csv(
+                     "results/df_census_state.csv",
+                     col_types = cols(
+                       .default      = col_character(),
+                       farm_area_ha  = col_number(),
+                       n_farms       = col_number(),
+                       activity_area = col_number(),
+                       workers       = col_number()
+                       )
+                     ) %>%
+                   dplyr::filter(
+                     state %in% report_states
+                   )
+
+df_yearly_prices <- readr::read_csv(
+                      "results/df_yearly_prices.csv",
+                      col_types = cols(
+                       .default = col_number(),
+                       year     = col_character()
+                       )
+                      )
+
+df_municipalities <- readr::read_csv(
+                       "results/df_municipalities.csv",
+                       col_types = cols(
+                         .default     = col_character(),
+                         legal_amazon = col_logical(),
+                         amazon_area_km2        = col_number(),
+                         atlantic_area_km2      = col_number(),
+                         caatinga_area_km2      = col_number(),
+                         cerrado_area_km2       = col_number(),
+                         islands_area_km2       = col_number(),
+                         pampa_area_km2         = col_number(),
+                         pantanal_area_km2      = col_number(),
+                         mun_area_km2           = col_number(),
+                         mun_protected_area_km2 = col_number(),
+                         yield_C                = col_number(),
+                         yield_S_pam            = col_number(),
+                         yield_S_mb             = col_number()
+                         )
+                       ) %>%
+                     dplyr::filter(
+                       state %in% report_states
+                       )
+
+```
+
+# Spatial data
+Using:
+- Mapbiomas' LULC rasters for 1985, 1990, 1996, 2006, 2017 and 2024;
+- IBGE's, CNUC's and FUNAI's shapefiles.
+I was able to partition Brazil in 5km x 5km plots, each of them associated with a few variables of interest. Below, I show a few results only for 1985 and restricted to states with significant Cerrado area. The data is available for the whole country for the years 1985, 1990, 1996, 2006, 2017 and 2024.
+
+```{r spatial_data, echo=FALSE, fig.width=14, fig.height=12}
+# default fig.width=7, making the figure wider must make it easier to plot the scales
+#
+# this sections needs param_year and report_states
+
+# filter grid_vars to the selected year
+grid_vars2 <- grid_vars %>%
+  dplyr::filter(year == param_year) %>%
+  dplyr::select(-year) %>%
+  dplyr::mutate(cv_I = cv_I_C + cv_I_S + cv_I_F)
+
+# identify cells belonging to the selected states
+mun_codes_spatial <- MUN_data %>%
+  dplyr::filter(state %in% report_states) %>%
+  dplyr::pull(code_mun) %>%
+  base::unique()
+
+grid_vars2 <- grid_vars2 %>%
+  dplyr::filter(code_mun %in% mun_codes_spatial)
+
+# join geometry and variables
+grid_sf <- grid_geom %>%
+  dplyr::filter(cell_id %in% grid_vars2$cell_id) %>%
+  dplyr::left_join(grid_vars2, by="cell_id")
+
+# shared map theme — removes axis clutter for spatial figures
+theme_map <- theme_void() +
+  theme(legend.position  = "right",
+        legend.key.height = unit(1.2, "cm"),
+        legend.key.width  = unit(0.4, "cm"),
+        plot.title        = element_text(size=10, face="bold", hjust=0.5),
+        plot.margin       = margin(2,2,2,2))
+
+# (1) cv_V — natural vegetation cover
+# colorblind-safe: viridis "viridis" (yellow-green-blue)
+fig_cv_V <- ggplot(grid_sf) +
+  geom_sf(aes(fill=cv_V), color=NA) +
+  scale_fill_viridis_c(option="viridis", limits=c(0,1),
+                       labels=scales::percent, name="") +
+  labs(title="Natural vegetation (cv_V)") +
+  theme_map
+
+# (2) cv_I — farming area
+# colorblind-safe: viridis "rocket" (white-orange-dark red)
+fig_cv_I <- ggplot(grid_sf) +
+  geom_sf(aes(fill=cv_I), color=NA) +
+  scale_fill_viridis_c(option="rocket", direction=-1, limits=c(0,1),
+                       labels=scales::percent, name="") +
+  labs(title="Farming area (cv_I)") +
+  theme_map
+
+# (3) cv_D — deforested abandoned area
+# colorblind-safe: viridis "mako" (white-teal-dark blue)
+fig_cv_D <- ggplot(grid_sf) +
+  geom_sf(aes(fill=cv_D), color=NA) +
+  scale_fill_viridis_c(option="mako", direction=-1, limits=c(0,1),
+                       labels=scales::percent, name="") +
+  labs(title="Abandoned area (cv_D)") +
+  theme_map
+
+# (4) yield_C — beef yield
+# sqrt transform reduces dominance of high-yield outliers
+fig_yield_C <- ggplot(grid_sf) +
+  geom_sf(aes(fill=yield_C), color=NA) +
+  scale_fill_viridis_c(option="plasma", trans="sqrt",
+                       name="tons/ha", na.value="grey90") +
+  labs(title="Beef yield (tons/ha)") +
+  theme_map
+
+# (5) yield_S_mb — soybean yield (area from mapbiomas)
+fig_yield_S_mb <- ggplot(grid_sf) +
+  geom_sf(aes(fill=yield_S_mb), color=NA) +
+  scale_fill_viridis_c(option="plasma", trans="sqrt",
+                       name="tons/ha", na.value="grey90") +
+  labs(title="Soybean yield (tons/ha, mb)") +
+  theme_map
+
+# (5) yield_S_pam — soybean yield (area from PAM)
+fig_yield_S_pam <- ggplot(grid_sf) +
+  geom_sf(aes(fill=yield_S_pam), color=NA) +
+  scale_fill_viridis_c(option="plasma", trans="sqrt",
+                       name="tons/ha", na.value="grey90") +
+  labs(title="Soybean yield (tons/ha, pam)") +
+  theme_map
+
+# (6) yield_S_fao — soybean yield (from FAO)
+fig_yield_S_fao <- ggplot(grid_sf) +
+  geom_sf(aes(fill=FAO_soy_yield), color=NA) +
+  scale_fill_viridis_c(option="plasma", trans="sqrt",
+                       name="tons/ha", na.value="grey90") +
+  labs(title="Soybean yield (tons/ha, fao)") +
+  theme_map
+
+# (7) protected — binary protected area flag
+# two-color discrete scale: grey = unprotected, teal = protected
+fig_protected <- ggplot(grid_sf) +
+  geom_sf(aes(fill=factor(protected)), color=NA) +
+  scale_fill_manual(values=c("0"="#d9d9d9", "1"="#009E73"),
+                    labels=c("0"="No", "1"="Yes"),
+                    name="") +
+  labs(title="Protected area") +
+  theme_map
+
+# arrange in 2x3 grid
+(fig_cv_V | fig_cv_I | fig_cv_D) /
+(fig_yield_S_mb | fig_yield_S_pam | fig_yield_S_fao) /
+(fig_yield_C | fig_protected) #+
+  #patchwork::plot_layout(widths=c(1,1,1))
+
+save_fig(fig_cv_V,        "spatial_fig_cv_V")
+save_fig(fig_cv_I,        "spatial_fig_cv_I")
+save_fig(fig_cv_D,        "spatial_fig_cv_D")
+save_fig(fig_yield_C,     "spatial_fig_yield_C")
+save_fig(fig_yield_S_mb,  "spatial_fig_yield_S_mb")
+save_fig(fig_yield_S_pam, "spatial_fig_yield_S_pam")
+save_fig(fig_yield_S_fao, "spatial_fig_yield_S_fao")
+save_fig(fig_protected,   "spatial_fig_protected")
+
+# clean up
+rm(grid_sf, grid_vars2, mun_codes_spatial,
+   theme_map, fig_cv_V, fig_cv_I, fig_cv_D,
+   fig_yield_C, fig_yield_S_mb, fig_yield_S_pam,
+   fig_yield_S_fao, fig_protected)
+
+rm(save_fig)
+```
+
+
+
+<!--
+# Processing
+## IBGE Census of Agriculture
+I take state-level data on farm area, farm workers and farm economic activity from IBGE's Census of Agriculture (1996, 2006 and 2017).
+
+1. I simplify IBGE's classification of farm area groups into 4 categories: `less_than_100_ha`, `from_100_to_1000_ha`, and `more_than_1000_ha`;
+2. I simplify IBGE's classification of farm economic activity into 8 categories: `cattle` (pecuária, produção mista), `forestry` (silvicultura e exploração florestal), `perm_crop` (lavoura permanente), `temp_crop` (lavoura temporária), `veg_coal` (produção de carvão vegetal), `total` (all farms), and `other`
+3. I simplify IBGE's classification of workers' yearly work days as `less_than_180`, `more_than_180` and `total`
+
+## Yearly municipality-level and price data
+1. In `scripts_yearly/0_load_mapbiomas.R` I use Mapbiomas' [dictionary of LULC classes](https://brasil.mapbiomas.org/codigos-de-legenda/) to simplify the original 31 classes into 7 classes: "natural cover", "pasture", "perennial crops", "soybean", "temporary crops" (other than soybeans), "forestry" and "not observed";
+2. In `scripts_yearly/1_sort_amc.R` I load IBGE's AMC table, Brazil's municipality codes table and IBGE's 2024 municipality shapefiles, get the classification of AMCs that cover 1980-2010, and check which of the municipalities that exist in the 2024 shapefiles do not exist in the AMC table:
+  - Pinto Bandeira (RS), Boa Esperança do Norte (MT), Paraíso das Águas (MS), Pescaria Brava (SC), Balneário Rincão (SC) and Mojuí dos Campos (PA) exist in 2024 but are not associated with any AMC in the AMC table, and I manually assign an AMC to each of these municipalities, deciding on the basis of their emancipation history;
+  - I update Brazil's municipality codes table so that it: (a) contains every single municipality in the 2024 municipality shapefiles; and (b) every municipality is associated with an AMC code;
+  - Even so, there are two polygons in the 2024 shapefiles that are not present in the `brazil_mun` (municipality codes) table: "Lagoa dos Patos (RS)" and "Lagoa Mirim (RS)", both classified as "Área Operacional" - these are lakes, not municipalities, so their presence in the shapefiles is not a problem;
+3. In `scripts_yearly/2_calculate_theta.R` I use municipality-level data to calculate AMC-level output and area values that allow me to calculate agricultural yield at the AMC level - this is passed down to the municipality level to avoid NAs in new municipalities:
+  - I join Mapbiomas' and IBGE's (PAM, PEVS and PPM) municipality-level data in a single `MUN_data` table;
+  - I use municipalities' AMC codes to aggregate all output and area date at the AMC level, in a single `AMC_data` table;
+  - I calculate `output_X` and `area_X` at the AMC level for Cattle, Soybean and Extractive/Forestry products and calculate `theta_X` at the AMC level; since Extractive/Forestry output are monetary values, I use IPEA's IGP data to bring these to 2024 values when calculating `output_F` and `theta_F`;
+  - The AMC-level `theta_X` are assigned to each municipality through the `MUN_data` table, which still preserves municipality-level values for `output_X` and `area_X`;
+  - `theta_C` is an approximation of how many tons of beef are sold yearly by hectare of pasture; `theta_S` is the number of tons of soybean produced by hectare of soybean farming; and `theta_F` is total value of extractive/forestry activities in 2024 prices;
+4. In `scripts_yearly/3_price_series.R` I use IPEA's and Paraná's Secretary of Agriculture's data to construct time series on commodity prices, interest rate and wage levels from 1985 to 2024:
+  - I use IGP-DI index to bring all prices and wage levels to 2024 values;
+  - I manipulate `price_C` and `price_S` so that they represent the price of a ton of beef/soybean; since price data is only available for 1995-2023, I assume that prices in 1985-1995 were at the same level as in 1995 and that prices in 2024 were the same as in 2023;
+  - I use IPEA's monthly cummulative interest rate data to calculate yearly cummulative interest rate data for 1985-2024.
+
+## Spatial data
+1. In `scripts_spatial/0_reproject.R`, I reproject all the spatial data to EPSG:5880:
+  - IBGE's shapefiles (municipalities, RGIs, RGINTs, states, biomes) are all originally EPSG:4674;
+  - Mapbiomas' LULC rasters (1985, 1990, 1996, 2006, 2017, 2024) are all originally EPSG:4326;
+  - CNUC's and FUNAI's shapefiles are originally EPSG:4674;
+  - FAO GAEZ's soybean yield raster is originally EPSG:4326.
+2. In `scripts_spatial/1_reclass.R`, I reclass the values of Mapbiomas' rasters to the following values:
+  - 0 = background;
+  - 1 = natural cover: originally, codes 3, 4, 5, 6, 11, 12, 29, 32, 49, 50;
+  - 2 = pasture: originally, codes 15, 21;
+  - 3 = temporary crops: originally, codes 20, 39, 40, 41, 62;
+  - 4 = perennial crops: originally, codes 35, 46, 47, 48;
+  - 5 = forest plantation: originally, code 9;
+  - 6 = non-vegetated: originally, codes 13, 23, 24, 25, 30, 31, 33, 75.
+  - Obs:
+    - value 13 shows up in 1985, 1990 and 1996 only;
+    - value 62 shows up in 2006, 2017 and 2024 only;
+    - value 75 shows up in 2017 and 2024 only;
+    - values 0 and 13 show up in the data but are not present in Mapbiomas' classes dictionary;
+    - value 27 shows up in Mapbiomas' classes dictionary but is not present in the data.
+3. In `scripts_spatial/2_create_grid.R`, I take `param_plot_km` and divide the whole Brazilian territory in plots of equal size:
+  - Any plot with less than 75% of their area in Brazil is treated as background;
+4. In `scripts_spatial/3_grid_tenure.R`, I use overlap the cell grid with various shapefiles and assign cell-level values:
+  - IBGE's 2024 municipality shapefile is used to define `code_mun` as the municipality code of the municipality that has the most area in that plot;
+  - IBGE's biome shapefile is used to define `code_biome` as the code of the biome that has the most area in that plot (1 for Amazônia, 2 for Caatinga, 3 for Cerrado, 4 for Mata Atlântica, 5 for Pampa, 6 for Pantanal and 7 for Ilhas Oceânicas) - I get a few NAs, so I use cell centroids to determine the biome of these cells as equal to the biome of the closest cell;
+  - CNUC's and FUNAI's shapefiles are used to define `pub_area` as the % of a cell's area that is within a Conservation Unit or Indigenous Territory, and this variable is used to define `protected` as a binary variable that is equal to 1 if a cell has more than 50% of its area protected.
+5. In `scripts_spatial/4_grid_lulc.R`, I use the reclassified LULC rasters to calculate cell-level LULC variables as the % of the cell's area in each LULC class:
+  - the cell grid is overlapped with the LULC rasters (1985, 1990, 1996, 2006, 2017, 2024) and the code calculates (for each year) each cell's `areaX_YYYY`, where `X` is a LULC class and `YYYY` is a given year.
+6. In `scripts_spatial/5_grid_complete.R`, I take the cell grid with all the information from `scripts_spatial/3_grid_tenure.R` and `scripts_spatial/4_grid_lulc.R`, and I use FAO GAEZ's raster to add information on soy yield:
+  - I remove "Lagoa dos Patos" and "Lagoa Mirim" from the final grid, since these are not actual municipalities;
+  - I separate the full shapefile into one `grid_geom` object of class `sf` storing only the grid's structure (cell id and geometry) and a `grid_vars` object of class `data.frame` storing cell-level variables for multiple years.
+7. In `scripts_spatial/6_imaflora.R`, I process Imaflora's land tenure data at the state level:
+  - for each state, I overlap the state shapefile from IBGE with Imaflora's land tenure polygons, summarizing the total area in each land tenure category, as well as the area that was not classified by Imaflora.
+8. In `scripts_spatial/7_imaflora_lulc.R`, I use Imaflora's land tenure polygons and Mapbiomas' reclassified LULC rasters to summarize, for each state and land tenure class, the area in each LULC category.
+  
+# Data Outputs
+## IBGE Census of Agriculture (State-level)
+- `workers_per_ha` = tibble with state-level data:
+  - columns `state`, `activity_group`, `workers`, `area`, `year`
+  - only registers workers/hectare for cattle ranching, soybean farming and forestry
+- `farm_area_by_class` = tibble with state-level data on area of farms by area group class for 1985, 1995, 2006 and 2017
+  - area groups: `less_than_100_ha`, `from_100_to_1000_ha`, `more_than_1000_ha`
+- `farm_number_by_class` = tibble with state-level data on number of farms by area group class, area groups are the same as above
+- `farm_area_by_class_2017` = tibble with state-level data on area of farms by area group class only for 2017
+  - area groups: `less_than_100_ha`, `from_100_to_1000_ha`, `from_1000_to_2500_ha`, `from_2500_to_10000_ha`, `more_than_10000_ha`
+- `farm_number_by_class_2017` = tibble with state-level data on number of farms by area group class, area groups are the same as above
+ 
+## Yearly municipality-level and price data
+- `MUN_data` = tibble with municipality-level data:
+  - identifier columns: `code_mun`, `year`, `name_mun`, `state`, `code_micro`, `name_micro`, `code_rgi`, `name_rgi`, `code_meso`, `name_meso`, `code_rgint`, `name_rgint`, `legal_amazon`, `code_amc`;
+  - LULC variable columns: `natcover_area`, `nonveg_area`, `NA_area`, `past_area`, `soy_area`, `tempc_area`, `forestry_area`, `perec_area`;
+  - productivity variables columns: `output_X`, `area_X` and `theta_X` where `X` is either `C`, `S` or `F` - for cattle and soybean, productivity is in tons per hectare; for sustainables, productivity is in output value (reais of 2024) per hectare.
+- `yearly_prices` = tibble with yearly data:
+  - columns `year`, `interest`, `wage`, `price_C` and `price_S`.
+   
+## Spatial data
+Considering the code up until `scripts_spatial/5_grid_complete.R`:
+- `grid_geom` = sf/data.frame dividing the whole Brazil into equal plots of size `param_plot_km`:
+  - columns `cell_id` and `geometry`
+- `grid_vars` = `data.frame` storing cell-level variables for multiple years:
+  - columns `cell_id`, `code_mun`, `code_biome`, `pub_area`, `protected`, `centroid_x`, `centroid_y`, `soy_yield`, `year`, `area_ha`, `cv_V`, `cv_I_C`, `cv_I_S`, `cv_I_F`, `cv_D`, `theta_C`, `theta_S`, `theta_F`.
+
+-->
