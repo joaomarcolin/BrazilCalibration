@@ -53,12 +53,12 @@ if (set_subset) {
 
 if (set_subset==FALSE) {
   # consider the whole country
-  area_sf <- sf::st_read("data_outputs/3_cell_grid/1_reproject/brazil_EPSG5880.shp") %>%
+  area_sf <- sf::st_read("data_outputs/1_cell_grid/1_reproject/brazil_EPSG5880.shp") %>%
     dplyr::select(geometry)
   
 } else if (set_subset==TRUE & set_subset_by=="state") {
   # consider only a subset of states
-  area_sf <- sf::st_read("data_outputs/3_cell_grid/1_reproject/states_EPSG5880.shp") %>%
+  area_sf <- sf::st_read("data_outputs/1_cell_grid/1_reproject/states_EPSG5880.shp") %>%
     dplyr::filter(state %in% set_subset_area) %>%
     sf::st_union() %>%
     sf::st_as_sf() %>%
@@ -66,7 +66,7 @@ if (set_subset==FALSE) {
   
 } else if (set_subset==TRUE & set_subset_by=="biome") {
   # consider only a biome
-  area_sf <- sf::st_read("data_outputs/3_cell_grid/1_reproject/biomes_EPSG5880.shp") %>%
+  area_sf <- sf::st_read("data_outputs/1_cell_grid/1_reproject/biomes_EPSG5880.shp") %>%
     dplyr::filter(name_biome %in% set_subset_area) %>%
     sf::st_union() %>%
     sf::st_as_sf() %>%
@@ -74,11 +74,11 @@ if (set_subset==FALSE) {
   
 } else if (set_subset==TRUE & set_subset_by=="both") {
   # get biome polygon
-  area_biome_sf <- sf::st_read("data_outputs/3_cell_grid/1_reproject/biomes_EPSG5880.shp") %>%
+  area_biome_sf <- sf::st_read("data_outputs/1_cell_grid/1_reproject/biomes_EPSG5880.shp") %>%
     dplyr::filter(name_biome == set_subset_area[1]) %>%
     dplyr::select(geometry)
   # get states polygon
-  area_state_sf <- sf::st_read("data_outputs/3_cell_grid/1_reproject/states_EPSG5880.shp") %>%
+  area_state_sf <- sf::st_read("data_outputs/1_cell_grid/1_reproject/states_EPSG5880.shp") %>%
     dplyr::filter(state %in% set_subset_area[-1]) %>%
     sf::st_union() %>%
     sf::st_as_sf() %>%
@@ -186,8 +186,8 @@ grid_sf <- grid_sf %>%
 
 # (4) saves grid outputs --------------------------------------------------
 # sets output path for raster and vector formats
-path_out_tif <- paste0("data_outputs/3_cell_grid/3_create_grid/",set_name,"_grid_",param_plot_km,"km.tif")
-path_out_shp <- paste0("data_outputs/3_cell_grid/3_create_grid/",set_name,"_grid_",param_plot_km,"km.shp")
+path_out_tif <- paste0("data_outputs/1_cell_grid/3_create_grid/",set_name,"_grid_",param_plot_km,"km.tif")
+path_out_shp <- paste0("data_outputs/1_cell_grid/3_create_grid/",set_name,"_grid_",param_plot_km,"km.shp")
 # saves .shp and .tif
 sf::st_write(grid_sf, path_out_shp, quiet = TRUE, append=FALSE, delete_layer=TRUE)
 terra::writeRaster(grid_rast, path_out_tif, overwrite = TRUE)

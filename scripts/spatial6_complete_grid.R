@@ -4,9 +4,9 @@
 # (1) load grid, load raster and set output path --------------------------
 terraOptions(progress = 1) # shows progress bar
 # load grid
-sf_grid <- sf::st_read(paste0("data_outputs/3_cell_grid/5_grid_lulc/",set_name,"_grid_lulc_",param_plot_km,"km.shp"))
+sf_grid <- sf::st_read(paste0("data_outputs/1_cell_grid/5_grid_lulc/",set_name,"_grid_lulc_",param_plot_km,"km.shp"))
 # load raster
-soy_rast <- terra::rast("data_outputs/3_cell_grid/1_reproject/fao_brazil_soy_yield.tif")
+soy_rast <- terra::rast("data_outputs/1_cell_grid/1_reproject/fao_brazil_soy_yield.tif")
 # check coordinate reference systems
 if(sf::st_crs(sf_grid) != sf::st_crs(soy_rast)) {
   warning("CRS mismath. Reprojecting grid to raster CRS for extraction.")

@@ -105,6 +105,8 @@ rm(pivot_rename)
 # (2.1) auxiliary function to substitute values and turn column "value" to numeric
 # "-" should be "0"
 # "X" and "..." should be NA
+#
+# note that, up to this point, the tables have no NA values at all
 subst_f <- function(df) {
   df <- df %>% 
     dplyr::mutate(value = as.numeric(case_when(value == "-"                 ~ "0",
@@ -114,27 +116,6 @@ subst_f <- function(df) {
                   )
 } # closes subst_f(df)
 
-## check all tables' column names
-#
-#tables_now <- data.frame(names = ls(), n_cols=NA,
-#                         col1=NA, col2=NA, col3=NA,
-#                         col4=NA, col5=NA)
-#for (idx in 1:15) {
-#  df_name <- tables_now$names[idx]
-#  df <- get(df_name)
-#  tables_now$n_cols[idx] <- dim(df)[2]
-#  tables_now$col1[idx] <- names(df)[1]
-#  tables_now$col2[idx] <- names(df)[2]
-#  tables_now$col3[idx] <- names(df)[3]
-#  if (dim(df)[2]==4) {
-#    tables_now$col4[idx] <- names(df)[4]
-#  } else if (dim(df)[2]==5) {
-#    tables_now$col4[idx] <- names(df)[4]
-#    tables_now$col5[idx] <- names(df)[5]
-#  }
-#}
-#rm(tables_now, idx, df_name, df)
-
 # (2.2) substitute values and group tables by column names
 # 1st group: columns "state" "class" "value"
 census1 <- list(area_1985 = subst_f(area_1985),
@@ -142,24 +123,26 @@ census1 <- list(area_1985 = subst_f(area_1985),
                 area_2006 = subst_f(area_2006),
                 farm_1985 = subst_f(farm_1985),
                 farm_1995 = subst_f(farm_1995),
-                farm_2006 = subst_f(farm_2006))
+                farm_2006 = subst_f(farm_2006)
+                )
 
 # 2nd group: columns "code_mun" "name_mun" "class" "value"
 census2 <- list(worker_1995        = subst_f(worker_1995),
                 area_activity_1995 = subst_f(area_activity_1995),
-                area_activity_2006 = subst_f(area_activity_2006),
-                area_activity_2017 = subst_f(area_activity_2017),
-                area_2017          = subst_f(area_2017),
-                farm_2017          = subst_f(farm_2017))
+                area_activity_2006 = subst_f(area_activity_2006), #  3255 NA values
+                area_activity_2017 = subst_f(area_activity_2017), #  5127 NA values
+                area_2017          = subst_f(area_2017),          # 17398 NA values
+                farm_2017          = subst_f(farm_2017)
+                )
 
 # 3rd group: columns "code_mun" "name_mun" "activity" "class" "value"
 census3 <- list(worker1_2006 = subst_f(worker1_2006),
                 worker2_2006 = subst_f(worker2_2006),
-                worker_2017  = subst_f(worker_2017))
+                worker_2017  = subst_f(worker_2017)   # 35590 NA values
+                )
 
 # (2.3) clean up
 rm(area_1985, area_1995, area_2006, farm_1985, farm_1995, farm_2006, worker_1995,
    area_activity_1995, area_activity_2006, area_activity_2017, area_2017, farm_2017,
    worker1_2006, worker2_2006, worker_2017,
    subst_f)
-

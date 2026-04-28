@@ -1,6 +1,13 @@
 # This script opens tables from IBGE's PAM and PPM yearly surveys at the
 # municipality level for 1985-2024 and joins them in a single dataframe
 
+# load df_mun
+df_mun <- readr::read_csv(
+            "data_outputs/2_brazil_mun/df_brazil_mun.csv",
+            col_types = cols(.default = col_character())
+            ) %>%
+          dplyr::select(code_mun:legal_amazon)
+
 # (1) load data -----------------------------------------------------------
 # auxiliary function to load yearly data
 # this function takes two file paths (because most data is stored in two files)
@@ -90,10 +97,14 @@ PPM_cattle_herd <- PPM_cattle_herd %>% dplyr::select(code_mun, year, ppm_herd=va
 df_yearly_mun <- PAM_soy_area %>%
   dplyr::full_join(PAM_soy_output,  by=join_by(code_mun,year)) %>%
   dplyr::full_join(PPM_cattle_herd, by=join_by(code_mun,year)) %>%
-  dplyr::full_join(mapbiomas_data,  by=join_by(code_mun,year))
+  dplyr::full_join(mapbiomas_data,  by=join_by(code_mun,year)) %>%
+  # get rid of Fernando de Noronha (code_mun=="2605459")
+  dplyr::filter(code_mun != "2605459") %>%
+  dplyr::select(code_mun, year, pam_area_ha:mb_pcrop_ha)
+# join grouping columns
+df_yearly_mun <- df_mun %>%
+  dplyr::left_join(df_yearly_mun, by = "code_mun")
+  
 # clean up
-rm(PAM_soy_area, PAM_soy_output, PPM_cattle_herd, mapbiomas_data)
-
-
-
+rm(PAM_soy_area, PAM_soy_output, PPM_cattle_herd, mapbiomas_data, df_mun)
 

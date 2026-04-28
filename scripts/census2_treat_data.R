@@ -3,18 +3,29 @@
 #
 # from "0_load_census_data.R", we have three lists of dataframes:
 # census1 contains dfs with columns "state" "class" "value"
-# area_1985/1995/2006
-# farm_1985/1995/2006
+# area_1985/1995/2006 #    0 NA values
+# farm_1985/1995/2006 #    0 NA values
 #
 # census2 contains dfs with columns "code_mun" "name_mun" "class" "value"
-# worker_1995
-# area_activity_1995/2006/2017
-# area_2017
-# farm_2017
+# worker_1995        #     0 NA values
+# area_activity_1995 #     0 NA values
+# area_activity_2006 #  3255 NA values
+# area_activity_2017 #  5127 NA values
+# area_2017          # 17398 NA values
+# farm_2017          #     0 NA values
 #
 # census3 contains dfs with columns "code_mun" "name_mun" "activity" "class" "value"
-# worker*_2006
-# worker_2017
+# worker1_2006       #     0 NA values
+# worker2_2006       #     0 NA values
+# worker_2017        # 35590 NA values
+
+# load df_mun
+df_mun <- readr::read_csv(
+            "data_outputs/2_brazil_mun/df_brazil_mun.csv",
+            col_types = cols(.default = col_character())
+            ) %>%
+          dplyr::select(code_mun:legal_amazon)
+  
 
 # (1) recode state names --------------------------------------------------
 dict_state <- c("Acre"              ="AC", "Alagoas"             ="AL",
@@ -182,20 +193,20 @@ rm(area_1985 ,area_1995, area_2006,
 # (5) create municipality-level table -------------------------------------
 # (5.1) deal with data on farm area and number of farms by area groups
 # (a) treat tables from census2
-area_2017 <- area_2017 %>% dplyr::transmute(code_mun, name_mun, year="2017", area_group=class, farm_area_ha=value)
-farm_2017 <- farm_2017 %>% dplyr::transmute(code_mun, name_mun, year="2017", area_group=class, n_farms=value)
+area_2017 <- area_2017 %>% dplyr::transmute(code_mun, year="2017", area_group=class, farm_area_ha=value)
+farm_2017 <- farm_2017 %>% dplyr::transmute(code_mun, year="2017", area_group=class, n_farms=value)
 # (b) join tables
 mun_area_group <- area_2017 %>%
   dplyr::full_join(farm_2017,
-                   by = join_by(code_mun, name_mun, year, area_group))
+                   by = join_by(code_mun, year, area_group))
 # (c) clean up
 rm(area_2017,farm_2017)
 
 # (5.2) deal with data on farm area by activity groups
 # (a) treat tables from census2
-area_activity_1995 <- area_activity_1995 %>% dplyr::transmute(code_mun, name_mun, year="1995", activity_group=class, activity_area=value)
-area_activity_2006 <- area_activity_2006 %>% dplyr::transmute(code_mun, name_mun, year="2006", activity_group=class, activity_area=value)
-area_activity_2017 <- area_activity_2017 %>% dplyr::transmute(code_mun, name_mun, year="2017", activity_group=class, activity_area=value)
+area_activity_1995 <- area_activity_1995 %>% dplyr::transmute(code_mun, year="1995", activity_group=class, activity_area=value)
+area_activity_2006 <- area_activity_2006 %>% dplyr::transmute(code_mun, year="2006", activity_group=class, activity_area=value)
+area_activity_2017 <- area_activity_2017 %>% dplyr::transmute(code_mun, year="2017", activity_group=class, activity_area=value)
 # (b) join tables
 mun_activity_area <- rbind(area_activity_1995, area_activity_2006, area_activity_2017)
 # (c) clean up
@@ -203,19 +214,19 @@ rm(area_activity_1995, area_activity_2006, area_activity_2017)
 
 # (5.3) deal with data on workers
 # (a) treat table from census2 - add a "day_group" column since this is available on the tables from census3
-worker_1995 <- worker_1995 %>% dplyr::transmute(code_mun, name_mun, year="1995", activity_group=class, day_group="total", workers=value)
+worker_1995 <- worker_1995 %>% dplyr::transmute(code_mun, year="1995", activity_group=class, day_group="total", workers=value)
 # (b) treat tables from census3
 # (b.1) 2006 data was divided in worker1 (relatives of the farmer) and worker2 (non-relatives of the farmer). I sum these.
-worker1_2006 <- worker1_2006 %>% dplyr::transmute(code_mun, name_mun, year="2006", activity_group=activity, day_group=class, worker1=value)
-worker2_2006 <- worker2_2006 %>% dplyr::transmute(code_mun, name_mun, year="2006", activity_group=activity, day_group=class, worker2=value)
+worker1_2006 <- worker1_2006 %>% dplyr::transmute(code_mun, year="2006", activity_group=activity, day_group=class, worker1=value)
+worker2_2006 <- worker2_2006 %>% dplyr::transmute(code_mun, year="2006", activity_group=activity, day_group=class, worker2=value)
 worker_2006  <- worker1_2006 %>%
   dplyr::full_join(worker2_2006,
-                   by = join_by(code_mun, name_mun, year, activity_group, day_group)) %>%
+                   by = join_by(code_mun, year, activity_group, day_group)) %>%
   dplyr::ungroup() %>%
-  dplyr::transmute(code_mun, name_mun, year, activity_group, day_group,
+  dplyr::transmute(code_mun, year, activity_group, day_group,
                    workers = worker1 + worker2)
 # (b.2) 2017 data already gives us the total number of workers
-worker_2017 <- worker_2017  %>% dplyr::transmute(code_mun, name_mun, year="2017", activity_group=activity, day_group=class, workers=value)
+worker_2017 <- worker_2017  %>% dplyr::transmute(code_mun, year="2017", activity_group=activity, day_group=class, workers=value)
 # (c) join tables
 mun_workers <- rbind(worker_1995, worker_2006, worker_2017)
 # (d) clean up
@@ -239,30 +250,34 @@ rm(worker_1995, worker1_2006, worker2_2006, worker_2006, worker_2017)
 # I don't adress this issue, these will show up as NAs
 #
 # (a) prepare tables for joining
-mun_area_group    <- mun_area_group    %>% dplyr::transmute(code_mun, name_mun, year, area_group,         activity_group="total", day_group="total", farm_area_ha, n_farms)
-mun_activity_area <- mun_activity_area %>% dplyr::transmute(code_mun, name_mun, year, area_group="total", activity_group,         day_group="total", activity_area)
-mun_workers       <- mun_workers       %>% dplyr::transmute(code_mun, name_mun, year, area_group="total", activity_group,         day_group,         workers)
-# (b) join everything
-df_census_mun <- mun_area_group %>%
-  dplyr::full_join(mun_activity_area, by=join_by(code_mun, name_mun, year, area_group, activity_group, day_group)) %>%
-  dplyr::full_join(mun_workers,       by=join_by(code_mun, name_mun, year, area_group, activity_group, day_group)) 
-# (c) add a 'state' column and arrange table
-df_census_mun <- df_census_mun %>%
-  # extract "state" from "name_mun"
-  dplyr::mutate(state=str_extract(name_mun,"(?<=\\()\\w{2}(?=\\))")) %>%
-  # arrange column order
-  dplyr:: select(code_mun, name_mun, state, year, area_group, activity_group, day_group,
-                 farm_area_ha, n_farms, activity_area, workers, state) %>%
-  # arrange row order
-  dplyr::arrange(code_mun, year, area_group, activity_group, day_group)
-# (d) clean up
-rm(mun_area_group, mun_activity_area, mun_workers)
+mun_area_group    <- df_mun %>% dplyr::left_join(mun_area_group,    by="code_mun") %>% dplyr::transmute(code_mun, year, area_group,         activity_group="total", day_group="total", farm_area_ha, n_farms)
+mun_activity_area <- df_mun %>% dplyr::left_join(mun_activity_area, by="code_mun") %>% dplyr::transmute(code_mun, year, area_group="total", activity_group,         day_group="total", activity_area)
+mun_workers       <- df_mun %>% dplyr::left_join(mun_workers,       by="code_mun") %>% dplyr::transmute(code_mun, year, area_group="total", activity_group,         day_group,         workers)
+# (b) fix NA rows due to some municipalities existing in df_codes but not in any of the census tables
+mun_area_group$year[is.na(mun_area_group$year)]                           <- "2017"
+mun_area_group$area_group[is.na(mun_area_group$area_group)]               <- "total"
+mun_activity_area$year[is.na(mun_activity_area$year)]                     <- "2006"
+mun_activity_area$activity_group[is.na(mun_activity_area$activity_group)] <- "total"
+mun_workers$year[is.na(mun_workers$year)]                                 <- "2006"
+mun_workers$activity_group[is.na(mun_workers$activity_group)]             <- "total"
+mun_workers$day_group[is.na(mun_workers$day_group)]                       <- "total"
+# (c) join everything
+mun_census <- mun_area_group %>%
+  dplyr::full_join(mun_activity_area, by=join_by(code_mun, year, area_group, activity_group, day_group)) %>%
+  dplyr::full_join(mun_workers,       by=join_by(code_mun, year, area_group, activity_group, day_group)) %>%
+  tidyr::complete(code_mun, year, area_group, activity_group, day_group)
+# (d) add grouping columns and remove Fernando de Noronha (code_mun=="2605459")
+df_census_mun <- df_mun %>%
+  dplyr::full_join(mun_census, by="code_mun") %>%
+  dplyr::filter(code_mun != "2605459")
+# (e) clean up
+rm(mun_area_group, mun_activity_area, mun_workers, mun_census, df_mun)
 
 # (6) aggregate municipality-level data at the state level ----------------
 # (6.1) sum numeric values from municipalities in the same state
 mun_agg <- df_census_mun %>%
   # get rid of municipality identifiers
-  dplyr::select(-code_mun, -name_mun) %>%
+  dplyr::select(state, year, area_group:workers) %>%
   # get rid of "landless" area group
   dplyr::filter(area_group != "landless") %>%
   # group variables
@@ -277,7 +292,8 @@ mun_agg <- df_census_mun %>%
 # (6.2) make sure that 'df_census_state' has all the same identifier columns as 'mun_agg'
 df_census_state <- df_census_state %>%
   dplyr::transmute(state, year, area_group, activity_group="total", day_group="total",
-                   farm_area_ha, n_farms)
+                   farm_area_ha, n_farms) %>%
+  tidyr::complete(state, year, area_group, activity_group, day_group)
 
 # note that the data in 'mun_agg' covers 1995, 2006 and 2017;
 # while the data in 'df_census_mun' covers 1985, 1995 and 2006
@@ -336,5 +352,3 @@ df_census_state <- df_census_state %>%
   dplyr::arrange(state, year, area_group, activity_group, day_group)
 # (f) clean up
 rm(mun_agg_2017, mun_agg_2017_as_prev)
-
-

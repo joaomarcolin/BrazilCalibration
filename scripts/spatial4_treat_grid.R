@@ -5,13 +5,13 @@
 ## This information is saved in a new shapefile.
 
 # (0) loads cell grid -----------------------------------------------------
-grid_vec  <- terra::vect(paste0("data_outputs/3_cell_grid/3_create_grid/",set_name,"_grid_",param_plot_km,"km.shp"))
-grid_rast <- terra::rast(paste0("data_outputs/3_cell_grid/3_create_grid/",set_name,"_grid_",param_plot_km,"km.tif"))
+grid_vec  <- terra::vect(paste0("data_outputs/1_cell_grid/3_create_grid/",set_name,"_grid_",param_plot_km,"km.shp"))
+grid_rast <- terra::rast(paste0("data_outputs/1_cell_grid/3_create_grid/",set_name,"_grid_",param_plot_km,"km.tif"))
 grid_sf   <- sf::st_as_sf(grid_vec) 
 
 # (1) assign municipality codes -------------------------------------------
 # load municipality shapefile
-mun_vec <- terra::vect("data_outputs/3_cell_grid/1_reproject/cities_EPSG5880.shp")
+mun_vec <- terra::vect("data_outputs/1_cell_grid/1_reproject/cities_EPSG5880.shp")
 mun_sf  <- sf::st_as_sf(mun_vec)
 # check coordinate reference systems match
 if (sf::st_crs(grid_sf) != sf::st_crs(mun_sf)) {
@@ -57,7 +57,7 @@ rm(mun_vec, mun_sf, mun_rast, mun_values, mun_id_lookup)
 # 7 islands
 
 # load biomes shapefile
-biomes_vec <- terra::vect("data_outputs/3_cell_grid/1_reproject/biomes_EPSG5880.shp")
+biomes_vec <- terra::vect("data_outputs/1_cell_grid/1_reproject/biomes_EPSG5880.shp")
 biomes_vec$code_biome <- as.integer(biomes_vec$code_biome)
 biomes_sf  <- sf::st_as_sf(biomes_vec)
 # check coordinate reference systems match
@@ -85,7 +85,7 @@ grid_sf <- grid_sf %>%
 rm(biomes_vec, biomes_rast, biomes_values)
 
 # (3) assign protected area coverage --------------------------------------
-protect_vec <- terra::vect("data_outputs/3_cell_grid/1_reproject/protected_areas_EPSG5880.shp")
+protect_vec <- terra::vect("data_outputs/1_cell_grid/1_reproject/protected_areas_EPSG5880.shp")
 protect_sf  <- sf::st_as_sf(protect_vec)
 # check that coordinate reference systems match
 if (sf::st_crs(grid_sf) != sf::st_crs(protect_sf)) {
@@ -154,7 +154,7 @@ if (length(na_cells) > 0) {
 rm(biomes_sf, na_centroids, nearest, na_cells)
 
 # (6) save outputs --------------------------------------------------------
-path_out_shp    <- paste0("data_outputs/3_cell_grid/4_treat_grid/",set_name,"_grid_tenure_",param_plot_km,"km.shp")
+path_out_shp    <- paste0("data_outputs/1_cell_grid/4_treat_grid/",set_name,"_grid_tenure_",param_plot_km,"km.shp")
 sf::st_write(grid_sf, path_out_shp, delete_layer=TRUE)
 rm(grid_rast, grid_vec, path_out_shp)
 
