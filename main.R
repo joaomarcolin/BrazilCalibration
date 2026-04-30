@@ -44,24 +44,25 @@ if (set_subset) {
   set_subset_area <- c("GO", "MT", "MS", "MA", "TO", "PI", "BA", "DF")
 }
 
-# (1) cell grid -----------------------------------------------------------
-# creates output folders
-if (!dir.exists("data_outputs/1_cell_grid/1_reproject"))     dir.create("data_outputs/1_cell_grid/1_reproject")
-if (!dir.exists("data_outputs/1_cell_grid/2_recode_lulc"))   dir.create("data_outputs/1_cell_grid/2_recode_lulc")
-if (!dir.exists("data_outputs/1_cell_grid/3_create_grid"))   dir.create("data_outputs/1_cell_grid/3_create_grid")
-if (!dir.exists("data_outputs/1_cell_grid/4_treat_grid"))    dir.create("data_outputs/1_cell_grid/4_treat_grid")
-if (!dir.exists("data_outputs/1_cell_grid/5_grid_lulc"))     dir.create("data_outputs/1_cell_grid/5_grid_lulc")
-if (!dir.exists("data_outputs/1_cell_grid/6_complete_grid")) dir.create("data_outputs/1_cell_grid/6_complete_grid")
-## create grid and calculate plot-level values
-#source("scripts/spatial1_reproject.R")     # reproject shapefiles and rasters # only need to run it once
-#source("scripts/spatial2_recode_lulc.R")   # reclass Mapbiomas' rasters       # only need to run it once
-source("scripts/spatial3_create_grid.R")   # create grid
-source("scripts/spatial4_treat_grid.R")    # identify farms
-source("scripts/spatial5_grid_lulc.R")     # calculate plot-level LULC variables
-source("scripts/spatial6_complete_grid.R") # generate final grid
-# save final data for calibration
-readr::write_csv(df_grid, paste0("data_outputs/1_cell_grid/6_complete_grid/df_",set_name,"_grid_",param_plot_km,"km.csv"))
-sf::st_write(sf_grid,     paste0("data_outputs/1_cell_grid/6_complete_grid/sf_",set_name,"_grid_",param_plot_km,"km.shp"), delete_layer=TRUE)
+## (1) cell grid -----------------------------------------------------------
+## creates output folders
+#if (!dir.exists("data_outputs/1_cell_grid/1_reproject"))     dir.create("data_outputs/1_cell_grid/1_reproject")
+#if (!dir.exists("data_outputs/1_cell_grid/2_recode_lulc"))   dir.create("data_outputs/1_cell_grid/2_recode_lulc")
+#if (!dir.exists("data_outputs/1_cell_grid/3_create_grid"))   dir.create("data_outputs/1_cell_grid/3_create_grid")
+#if (!dir.exists("data_outputs/1_cell_grid/4_treat_grid"))    dir.create("data_outputs/1_cell_grid/4_treat_grid")
+#if (!dir.exists("data_outputs/1_cell_grid/5_grid_lulc"))     dir.create("data_outputs/1_cell_grid/5_grid_lulc")
+#if (!dir.exists("data_outputs/1_cell_grid/6_complete_grid")) dir.create("data_outputs/1_cell_grid/6_complete_grid")
+### create grid and calculate plot-level values
+##source("scripts/spatial1_reproject.R")     # reproject shapefiles and rasters # only need to run it once
+##source("scripts/spatial2_recode_lulc.R")   # reclass Mapbiomas' rasters       # only need to run it once
+#source("scripts/spatial3_create_grid.R")   # create grid
+#source("scripts/spatial4_treat_grid.R")    # identify farms
+#source("scripts/spatial5_grid_lulc.R")     # calculate plot-level LULC variables
+#source("scripts/spatial6_complete_grid.R") # generate final grid
+#
+## save final data for calibration
+#readr::write_csv(df_grid, paste0("data_outputs/1_cell_grid/6_complete_grid/df_",set_name,"_grid_",param_plot_km,"km.csv"))
+#sf::st_write(sf_grid,     paste0("data_outputs/1_cell_grid/6_complete_grid/sf_",set_name,"_grid_",param_plot_km,"km.shp"), delete_layer=TRUE)
 
 # (2) group municipalities ------------------------------------------------
 # most data is available at the municipality-level, and many municipalities were
@@ -91,7 +92,21 @@ source("scripts/yearly3_price_data.R")     # get yearly country-level variables
 readr::write_csv(df_yearly_mun,    "data_outputs/4_yearly_data/df_yearly_mun.csv")
 readr::write_csv(df_yearly_prices, "data_outputs/4_yearly_data/df_prices.csv")
 
-# (5) final results -------------------------------------------------------
+# (5) report results ------------------------------------------------------
+#source("scripts/census3_get_parameters.R") # calculate model parameters
+#source("scripts/yearly3_sort_amc.R")          # sort municipalities by AMC
+#source("scripts/yearly4_calculate_yield.R")   # calculate yield
+#source("scripts/yearly5_price_series.R")      # get yearly country-level variables
+
+# define which states will be included in the report
+# "SP" and "MG" also have significant Cerrado area but were not included
+report_states <- c("GO", "MT", "MS", "MA", "TO", "PI", "BA", "DF")
+
+# render report
+rmarkdown::render("report1.Rmd", output_file = "report1.html")
+#rmarkdown::render("report2.Rmd", output_file = "report2.html")
+
+# (6) final results -------------------------------------------------------
 source("scripts/final1_data.R")           # group municipality-level data
 source("scripts/final2_initialization.R") # generate final grid_df
 
@@ -102,17 +117,4 @@ readr::write_csv(df_yearly_prices,  "results/df_yearly_prices.csv")
 readr::write_csv(df_municipalities, "results/df_municipalities.csv")
 readr::write_csv(df_grid,    paste0("results/grid_df_",set_name,"_",param_plot_km,"km.csv"))
 #sf::st_write(sf_grid,        paste0("results/grid_sf_",set_name,"_",param_plot_km,"km.shp"), delete_layer=TRUE)
-
-# (6) report results ------------------------------------------------------
-
-#source("scripts/census3_get_parameters.R") # calculate model parameters
-#source("scripts/yearly3_sort_amc.R")          # sort municipalities by AMC
-#source("scripts/yearly4_calculate_yield.R")   # calculate yield
-#source("scripts/yearly5_price_series.R")      # get yearly country-level variables
-
-# define which states will be included in the report
-# "SP" and "MG" also have significant Cerrado area but were not included
-cerrado_states <- c("GO", "MT", "MS", "MA", "TO", "PI", "BA", "DF")
-# render report
-rmarkdown::render("report.Rmd", output_file = "report.html")
 

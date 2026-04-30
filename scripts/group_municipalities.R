@@ -25,13 +25,16 @@ brazil_amc_df <- read_csv("data_inputs/BdD/brasil_amc.csv", col_types = cols(.de
     code_amc  = id_amc)
 
 # load municipalities shapefiles from 2024
-cities_sf <- st_read("data_outputs/1_cell_grid/1_reproject/cities_EPSG5880.shp")
+cities_sf <- sf::st_read("data_outputs/1_cell_grid/1_reproject/cities_EPSG5880.shp", quiet = TRUE)
 # load biomes shapefiles
-biomes_sf <- st_read("data_outputs/1_cell_grid/1_reproject/biomes_EPSG5880.shp")
+biomes_sf <- sf::st_read("data_outputs/1_cell_grid/1_reproject/biomes_EPSG5880.shp", quiet = TRUE)
 # load protected area shapefiles
-protected_sf <- st_read("data_outputs/1_cell_grid/1_reproject/protected_areas_EPSG5880.shp")
+protected_sf <- sf::st_read("data_outputs/1_cell_grid/1_reproject/protected_areas_EPSG5880.shp", quiet = TRUE)
+# load FAO GAEZ's raster for attainable soybean yield
+fao_rast <- terra::rast("data_outputs/1_cell_grid/1_reproject/fao_brazil_soy_yield.tif")
 
 # (2) calculate biome area per municipality -------------------------------
+tic("Calculate biome area per municipality")
 # intersect municipalities' and biomes' polygons
 mun_biome_sf <- sf::st_intersection(cities_sf, biomes_sf)
 
@@ -58,12 +61,13 @@ mun_biome_df <- mun_biome_df %>%
 
 # clean up polygon data
 rm(biomes_sf, mun_biome_sf)
+toc()
 
 # (3) calculate municipality protected area -------------------------------
 # check if protected areas overlap
 #overlaps <- sf::st_overlaps(protected_sf)
 #any(lengths(overlaps)>0)
-
+tic("Calculate protected area per municipality")
 # intersect municipalities' and protected areas' polygons
 mun_protected_sf <- sf::st_intersection(cities_sf, protected_sf)
 
@@ -76,9 +80,26 @@ mun_protected_df <- mun_protected_sf %>%
   dplyr::summarise(mun_protected_area_km2 = sum(protected_area_km2))
 
 # clean up polygon data
-rm(cities_sf, protected_sf, mun_protected_sf)
+rm(protected_sf, mun_protected_sf)
+toc()
 
-# (4) join everything in a single table -----------------------------------
+# (4) calculate municipality attainable soybean yield ---------------------
+tic("Calculate municipality average attainable soybean yield")
+mun_soy_yield_df <- exactextractr::exact_extract(fao_rast, cities_sf,
+                                                 fun = "mean",
+                                                 force_df = TRUE,
+                                                 append_cols = "code_mun")
+
+# FAO's yield is in kg/ha, I need values in tons/ha
+names(mun_soy_yield_df)[2] <- "FAO_soy_yield"
+mun_soy_yield_df$FAO_soy_yield <- mun_soy_yield_df$FAO_soy_yield/1000
+# replace NAs with 0s
+mun_soy_yield_df$FAO_soy_yield[is.na(mun_soy_yield_df$FAO_soy_yield)] <- 0
+# clean up
+rm(cities_sf, fao_rast)
+toc()
+
+# (5) join everything in a single table -----------------------------------
 df_brazil_mun <- brazil_amc_df %>%
   dplyr::full_join(
     brazil_mun_df,
@@ -91,6 +112,10 @@ df_brazil_mun <- brazil_amc_df %>%
   dplyr::full_join(
     mun_protected_df,
     by = "code_mun"
+  ) %>%
+  dplyr::full_join(
+    mun_soy_yield_df,
+    by = "code_mun"
   )
 
 # fix column 'legal_amazon': should be logical, is character
@@ -99,8 +124,7 @@ df_brazil_mun$legal_amazon <- as.logical(as.integer(df_brazil_mun$legal_amazon))
 df_brazil_mun$mun_protected_area_km2[is.na(df_brazil_mun$mun_protected_area_km2)] <- 0
 
 # clean up
-rm(brazil_amc_df, brazil_mun_df, mun_biome_df, mun_protected_df)
-
+rm(brazil_amc_df, brazil_mun_df, mun_biome_df, mun_protected_df, mun_soy_yield_df)
 
 # (5) deal with missing code_amc values -----------------------------------
 

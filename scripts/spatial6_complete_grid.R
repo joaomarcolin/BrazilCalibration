@@ -16,9 +16,7 @@ if(sf::st_crs(sf_grid) != sf::st_crs(soy_rast)) {
 # (2) process raster ------------------------------------------------------
 # exact_extract returns a data.frame with 'cell_id' and columns for each class
 plot_yield <- exactextractr::exact_extract(soy_rast, sf_grid,
-                                           weights="area",
-                                           fun="weighted_mean",
-                                           coverage_area=TRUE,
+                                           fun="mean",
                                            force_df=TRUE,
                                            append_cols="cell_id")
 # FAO's yield is in kg/ha, I need values in tons/ha

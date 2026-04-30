@@ -55,7 +55,8 @@ rm(dict)
 # summarize
 mapbiomas_data <- mapbiomas_data %>%
   dplyr::group_by(code_mun, class) %>%
-  dplyr::summarise(across(where(is.numeric), \(x) sum(x,na.rm=TRUE))) %>%
+  dplyr::summarise(across(where(is.numeric), \(x) sum(x,na.rm=TRUE)),
+                   .groups = "drop") %>%
   dplyr::ungroup()
 
 # mapbiomas_data has "Lagoa dos Patos" (4300002) and "Lagoa Mirim" (4300001), which are not municipalities
