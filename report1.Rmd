@@ -19,7 +19,7 @@ param_plot_km <- 5
 set_subset    <- FALSE
 set_name      <- "brazil"
 
-report_states <- c("GO", "MT", "MS", "MA", "TO", "PI", "BA", "DF", "AC", "AP", "AM", "PA", "RO", "RR")
+report_states <- if (exists("set_subset_area")) set_subset_area else c("GO", "MT", "MS", "MA", "TO", "PI", "BA", "DF")
 ```
 
 
@@ -151,7 +151,7 @@ rm(plot_interest, plot_wage, plot_price_C, plot_price_S, df_yearly_prices2)
 ```
 
 # Beef and Soybean yield
-## National and State-level trends
+## National and State yields over time
 
 ```{r yearly_agg_yield, echo=FALSE}
 # summarise at the state level
@@ -208,10 +208,10 @@ plot_yield_C_state <- ggplot(yearly_state_data, aes(x=year, y=yield_C, color=sta
 # plot yield_S
 plot_yield_S_state <- ggplot(yearly_state_data, aes(x=year, y=yield_S, color=state)) +
   geom_line() +
-  labs(title="Soybean yield (mb)", x="Year", y="tons/ha", color="State") +
+  labs(title="Soybean yield", x="Year", y="tons/ha", color="State") +
   theme_minimal()
 
-(plot_yield_C | plot_yield_S) /
+(plot_yield_C | plot_yield_S)
 (plot_yield_C_state | plot_yield_S_state)
 
 save_fig(plot_yield_C, "Brazil_yield_C")
@@ -225,78 +225,6 @@ rm(plot_yield_C, plot_yield_S,
    yearly_brazil_data, yearly_state_data)
 
 
-```
-
-
-```{r yearly_mun_yield, echo=FALSE}
-## auxiliary function to summarise by municipality group
-#summarise_mun_yield_f <- function(yr) {
-#  # define grouping column
-#  group_col <- paste0("group_",yr)
-#  # summarise df_yearly_mun
-#  df_year <- df_yearly_mun %>%
-#    dplyr::select(
-#      all_of(group_col), year,
-#      pam_area_ha, pam_output_ton,
-#      ppm_herd, mb_pasture_ha
-#      ) %>%
-#    dplyr::group_by(
-#      across(all_of(group_col)),
-#      year
-#      ) %>%
-#    dplyr::summarise(
-#      across(everything(), ~sum(.x, na.rm = TRUE)),
-#      .groups = "drop"
-#      ) %>%
-#    dplyr::mutate(
-#      area_C   = mb_pasture_ha,
-#      output_C = ppm_herd*0.1*0.4,
-#      area_S   = pam_area_ha,
-#      output_S = pam_output_ton
-#    ) %>%
-#    dplyr::filter(
-#      year >= as.integer(yr)
-#    )
-#  # calculate yield
-#  df_year$yield_C <- ifelse(df_year$area_C > 0,
-#                            df_year$output_C / df_year$area_C,
-#                            0)
-#  df_year$yield_S <- ifelse(df_year$area_S > 0,
-#                            df_year$output_S/df_year$area_S,
-#                            0)
-#  # return summarised data.frame
-#  return(df_year)
-#} # close summarise_mun_yield_f(yr)
-#
-## summarise by municipality group
-#mun_1985_yearly_data <- summarise_mun_yield_f("1985")
-#mun_1995_yearly_data <- summarise_mun_yield_f("1995")
-#mun_2006_yearly_data <- summarise_mun_yield_f("2006")
-#mun_2017_yearly_data <- summarise_mun_yield_f("2017")
-#rm(summarise_mun_yield_f)
-#
-## very few 0 values for cattle, it's probably safe to use the minimum productivity as the lower bound
-#sum(mun_1985_yearly_data$yield_C==0) # 130
-#sum(mun_1995_yearly_data$yield_C==0) # 116
-#sum(mun_2006_yearly_data$yield_C==0) # 50
-#sum(mun_2017_yearly_data$yield_C==0) # 10
-#
-## too many 0 values for soybean - need to deal with this somehow
-#sum(mun_1985_yearly_data$yield_S==0) # 27794
-#sum(mun_1995_yearly_data$yield_S==0) # 26285
-#sum(mun_2006_yearly_data$yield_S==0) # 22063
-#sum(mun_2017_yearly_data$yield_S==0) #  8454
-#
-## there are a few extreme values in the IBGE data, it's probably best to use FAO GAEZ's attainable yield for soybean
-#summary(df_brazil_mun$FAO_soy_yield)
-#summary(mun_1985_yearly_data$yield_S[mun_1985_yearly_data$yield_S>0])
-#summary(mun_1995_yearly_data$yield_S[mun_1995_yearly_data$yield_S>0])
-#summary(mun_2006_yearly_data$yield_S[mun_2006_yearly_data$yield_S>0])
-#summary(mun_2017_yearly_data$yield_S[mun_2017_yearly_data$yield_S>0])
-#
-## clean up
-#rm(mun_1985_yearly_data, mun_1995_yearly_data,
-#   mun_2006_yearly_data, mun_2017_yearly_data)
 ```
 
 ## Distribution of municipality-level yield
@@ -338,24 +266,38 @@ summarise_mun_yield_f <- function(yr) {
   df_year$yield_S <- ifelse(df_year$area_S > 0,
                             df_year$output_S/df_year$area_S,
                             0)
-  ## get code_mun back to data.frame
-  #df_year <- df_yearly_mun %>%
-  #  dplyr::select(code_mun, all_of(group_col)) %>%
-  #  dplyr::left_join(df_year, by=group_col) %>%
-  #  dplyr::select(code_mun, year, area_C:yield_S)
   # return summarised data.frame
   return(df_year)
 } # close summarise_mun_yield_f(yr)
 
 # summarise by municipality group
-mun_1985_yearly_data <- summarise_mun_yield_f("1985") %>% rename(mun = group_1985)
-mun_1995_yearly_data <- summarise_mun_yield_f("1995") %>% rename(mun = group_1995)
-mun_2006_yearly_data <- summarise_mun_yield_f("2006") %>% rename(mun = group_2006)
-mun_2017_yearly_data <- summarise_mun_yield_f("2017") %>% rename(mun = group_2017)
-rm(summarise_mun_yield_f)
+mun_1985_yield <- summarise_mun_yield_f("1985") %>% rename(mun = group_1985)
+mun_1995_yield <- summarise_mun_yield_f("1995") %>% rename(mun = group_1995)
+mun_2006_yield <- summarise_mun_yield_f("2006") %>% rename(mun = group_2006)
+mun_2017_yield <- summarise_mun_yield_f("2017") %>% rename(mun = group_2017)
 
-mun_yields_years <- rbind(mun_1985_yearly_data, mun_1995_yearly_data,
-                          mun_2006_yearly_data, mun_2017_yearly_data)
+## very few 0 values for cattle, it's probably safe to use the minimum productivity as the lower bound
+#sum(mun_1985_yield$yield_C==0) # 1
+#sum(mun_1995_yield$yield_C==0) # 0
+#sum(mun_2006_yield$yield_C==0) # 1
+#sum(mun_2017_yield$yield_C==0) # 0
+#
+## too many 0 values for soybean - need to deal with this somehow
+#sum(mun_1985_yield$yield_S==0) # 614
+#sum(mun_1995_yield$yield_S==0) # 803
+#sum(mun_2006_yield$yield_S==0) # 989
+#sum(mun_2017_yield$yield_S==0) # 883
+#
+## when looking at the whole country, there are a few extreme values in the IBGE data
+## when looking at GO, MT, MS, MA, TO, PI, BA, and DF, soy yields from PAM have reasonable values
+#summary(df_brazil_mun$FAO_soy_yield)
+#summary(mun_1985_yield$yield_S[mun_1985_yield$yield_S>0])
+#summary(mun_1995_yield$yield_S[mun_1995_yield$yield_S>0])
+#summary(mun_2006_yield$yield_S[mun_2006_yield$yield_S>0])
+#summary(mun_2017_yield$yield_S[mun_2017_yield$yield_S>0])
+
+mun_yields_years <- rbind(mun_1985_yield, mun_1995_yield,
+                          mun_2006_yield, mun_2017_yield)
 
 # plot dispersion of yield_C
 plot_box_C_years <- mun_yields_years %>%
@@ -373,7 +315,7 @@ plot_box_C_years <- mun_yields_years %>%
   theme_minimal() +
   theme(axis.text.x = element_text(angle=45, hjust=1))
 
-# plot dispersion of yield_S_mb
+# plot dispersion of yield_S (from IBGE's PAM)
 plot_box_S_years <- mun_yields_years %>%
   dplyr::filter(area_S > 0) %>%
   ggplot(
@@ -383,49 +325,54 @@ plot_box_S_years <- mun_yields_years %>%
   scale_fill_manual(values=c("1985"="#7b3b63","1995"="#9e5c84","2006"="#b56d95","2017"="#C27BA0"),
                     guide="none") +
   facet_wrap(~state, ncol=4, scales="free_y") +
-  labs(title    = "Soybean yield distribution across years",
+  labs(title    = "Soybean yield (IBGE) distribution across years",
        subtitle = paste0("Municipalities with soy area > 0 ha"),
        x="Year", y="tons / ha") +
   theme_minimal() +
   theme(axis.text.x = element_text(angle=45, hjust=1))
 
-(plot_box_C_years | plot_box_S_years)
-
-save_fig(plot_box_C_years, "states_theta_C_box_plot_yearly")
-save_fig(plot_box_S_years, "states_theta_S_box_plot_yearly")
-
-rm(mun_yields, mun_yields_years,
-   plot_box_C_years, plot_box_S_years)
-```
-
-```{r mun_yield_distribution_fao, echo=FALSE, fig.width=14, fig.height=8}
-# default fig.width=7, making the figure wider must make it easier to plot the scales
-
-# municipality-level yields
-mun_yields <- df_brazil_mun %>%
-  dplyr::filter(state %in% report_states) %>%
-  dplyr::select(code_mun, state, mun_area_km2, FAO_soy_yield)
-
-# plot beef yield distribution
-plot_box_S_fao <- mun_yields %>%
+# plot dispersion of yield_S (from FAO GAEZ)
+# get municipalities with soybean area > 0 ha in 2017
+df_mun_with_soy_area_2017 <- df_yearly_mun %>%
+  dplyr::filter(
+    year          ==   2017,
+    mb_soybean_ha >    0,
+    state         %in% report_states
+  )
+mun_with_soy_area_2017 <- df_mun_with_soy_area_2017$code_mun
+# create plot
+plot_box_S_fao <- df_brazil_mun %>%
+  dplyr::filter(code_mun %in% mun_with_soy_area_2017) %>%
   ggplot(
-    aes(x = reorder(state, FAO_soy_yield, FUN=median), y = FAO_soy_yield)
-    ) +
-  geom_boxplot(outlier.size=0.8, fill="#C27BA0") +
-  coord_flip() +
-  labs(title  = paste0("Soybean attainable yield distribution by state (FAO GAEZ)"),
-       x = NULL, y = "tons / ha") +
-  theme_minimal()
+    aes(x = factor(state), y = FAO_soy_yield, fill = factor(state))
+  ) +
+  geom_boxplot(outlier.size=0.5) +
+  labs(title    = "Soybean yield (FAO) distribution (1981-2010)",
+       subtitle = paste0("Municipalities with soy area > 0 ha in 2017"),
+       x="State", y="tons / ha", fill="State") +
+  guides(fill="none") + # omit legent with state names
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle=45, hjust=1))
+
+
+( plot_box_C_years | plot_box_S_years )
 
 plot_box_S_fao
 
-save_fig(plot_box_S_fao,"states_yield_S_fao_box_plot")
+save_fig(plot_box_C_years, "states_theta_C_box_plot_yearly")
+save_fig(plot_box_S_years, "states_theta_S_box_plot_yearly")
+save_fig(plot_box_S_fao,   "states_theta_S_box_plot_fao")
 
-rm(plot_box_C, plot_box_S_fao)
+rm(mun_yields, mun_yields_years, summarise_mun_yield_f,
+   df_mun_with_soy_area_2017, mun_with_soy_area_2017,
+   mun_1985_yield, mun_1995_yield,
+   mun_2006_yield, mun_2017_yield,
+   plot_box_C_years, plot_box_S_years, plot_box_S_fao)
+
 ```
 
 # Land Use and Cover Change
-
+## Brazil
 ```{r yearly_LULC, echo=FALSE}
 
 # (1) first I generate a plot with all LULC categories from yearly_data
@@ -532,7 +479,7 @@ rm(yearly_data2, yearly_LULC_data, yearly_LULC2, lulc_order, lulc_order2, yearly
 
 ```
 
-
+## States
 ```{r yearly_LULC_by_state, echo=FALSE}
 # get lulc variables for state-year pairs
 lulc_state <- df_yearly_mun %>%
@@ -577,25 +524,37 @@ rm(lulc_state, plot_lulc_state)
 
 ```
 
-<!--
 # Labor intensity
 
+<!--
 Using data from IBGE's Census of Agriculture (available for 1985, 1995, 2006, and 2017) at the state level, I calculate the number of workers per hectare in three sectors of activity: cattle ranching, temporary crops and forestry. Below, I provide the numbers for states with large Cerrado areas and the country as a whole:
+-->
 
 ```{r labor_intensity_ha, echo=FALSE}
 
 # state-level data
-labor_intensity_state <- workers_per_ha %>%
-  dplyr::filter(state %in% cerrado_states,
-                activity_group %in% c("cattle", "temp_crop")) %>%
-  dplyr::group_by(state, activity_group, year) %>%
-  dplyr::summarise(workers = sum(workers, na.rm=TRUE),
-                   area    = sum(area,    na.rm=TRUE)) %>%
-  dplyr::ungroup() %>%
-  dplyr::mutate(workers_ha = workers/area) %>%
-  dplyr::select(state, activity_group, year, workers_ha) %>%
-  tidyr::pivot_wider(names_from=c(activity_group,year),
-                     values_from=workers_ha)
+labor_intensity_state <- df_census_state %>%
+  dplyr::filter(
+    state %in% report_states,
+    area_group == "total",
+    activity_group %in% c("cattle", "temp_crop"),
+    day_group == "total"
+    ) %>%
+  dplyr::select(
+    state, year, activity_group, 
+    activity_area, workers
+    ) %>%
+  dplyr::mutate(
+    workers_per_ha = workers/activity_area # POR ALGUM MOTIVO SÓ SOBRA 2017
+    ) #%>%
+  #dplyr::group_by(state, year, activity_group) %>%
+  #dplyr::summarise(workers = sum(workers, na.rm=TRUE),
+  #                 area    = sum(area,    na.rm=TRUE)) %>%
+  #dplyr::ungroup() %>%
+  #dplyr::mutate(workers_ha = workers/area) %>%
+  #dplyr::select(state, activity_group, year, workers_ha) %>%
+  #tidyr::pivot_wider(names_from=c(activity_group,year),
+  #                   values_from=workers_ha)
 
 # national-level data
 labor_intensity_national <- workers_per_ha %>%
@@ -1142,5 +1101,5 @@ rm(area_by_activity2, get_shares, build_wide, activity_area_by_state,
 
 ```
 
--->
+
 
