@@ -2,6 +2,10 @@
 .Rhistory
 .RData
 .Ruserdata
+.RDataTmp
+*.html
 
 data_inputs/
 data_outputs/
+figures/
+results/

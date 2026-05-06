@@ -5,24 +5,6 @@ date: "28/04/2026"
 output: html_document
 ---
 
-```{r preamble, include=FALSE}
-# loads everything we need from main.R so I don't have to go back to that script
-rm(list=ls())
-library(tidyverse)
-library(terra)
-library(sf)
-library(exactextractr)
-library(readxl)
-library(tictoc)
-
-param_plot_km <- 5
-set_subset    <- FALSE
-set_name      <- "brazil"
-
-report_states <- if (exists("set_subset_area")) set_subset_area else c("GO", "MT", "MS", "MA", "TO", "PI", "BA", "DF")
-```
-
-
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = FALSE, message = FALSE, warning = FALSE, out.width='800px')
 
@@ -200,13 +182,17 @@ plot_yield_S <- plot_var(yearly_brazil_data, "yield_S", "tons per ha.", "Soybean
 
 # plot state-level data
 # plot yield_C
-plot_yield_C_state <- ggplot(yearly_state_data, aes(x=year, y=yield_C, color=state)) +
+plot_yield_C_state <- yearly_state_data %>%
+  dplyr::filter(state %in% report_states) %>%
+  ggplot(aes(x=year, y=yield_C, color=state)) +
   geom_line() +
   labs(title="Beef yield", x="Year", y="tons/ha", color="State") +
   theme_minimal()
 
 # plot yield_S
-plot_yield_S_state <- ggplot(yearly_state_data, aes(x=year, y=yield_S, color=state)) +
+plot_yield_S_state <- yearly_state_data %>%
+  dplyr::filter(state %in% report_states) %>%
+  ggplot(aes(x=year, y=yield_S, color=state)) +
   geom_line() +
   labs(title="Soybean yield", x="Year", y="tons/ha", color="State") +
   theme_minimal()
@@ -535,46 +521,64 @@ Using data from IBGE's Census of Agriculture (available for 1985, 1995, 2006, an
 # state-level data
 labor_intensity_state <- df_census_state %>%
   dplyr::filter(
-    state %in% report_states,
-    area_group == "total",
+    state          %in% report_states,
+    area_group     ==   "total",
     activity_group %in% c("cattle", "temp_crop"),
-    day_group == "total"
+    day_group      ==   "total"
     ) %>%
   dplyr::select(
     state, year, activity_group, 
     activity_area, workers
     ) %>%
   dplyr::mutate(
-    workers_per_ha = workers/activity_area # POR ALGUM MOTIVO SÓ SOBRA 2017
-    ) #%>%
-  #dplyr::group_by(state, year, activity_group) %>%
-  #dplyr::summarise(workers = sum(workers, na.rm=TRUE),
-  #                 area    = sum(area,    na.rm=TRUE)) %>%
-  #dplyr::ungroup() %>%
-  #dplyr::mutate(workers_ha = workers/area) %>%
-  #dplyr::select(state, activity_group, year, workers_ha) %>%
-  #tidyr::pivot_wider(names_from=c(activity_group,year),
-  #                   values_from=workers_ha)
+    workers_per_ha = workers/activity_area
+    ) %>%
+  dplyr::select(
+    state, activity_group, year, workers_per_ha
+    ) %>%
+  tidyr::pivot_wider(
+    names_from  = c(activity_group, year),
+    values_from = workers_per_ha
+    ) %>%
+  dplyr::select(
+    state, cattle_1995, temp_crop_1995, cattle_2006, temp_crop_2006, cattle_2017, temp_crop_2017
+    )
 
 # national-level data
-labor_intensity_national <- workers_per_ha %>%
-  dplyr::filter(activity_group %in% c("cattle","temp_crop")) %>%
-  dplyr::group_by(activity_group, year) %>%
-  dplyr::summarise(workers = sum(workers, na.rm=TRUE),
-                   area    = sum(area,    na.rm=TRUE)) %>%
-  dplyr::ungroup() %>%
-  dplyr::mutate(workers_ha = workers/area,
-                state      = "Brazil") %>%
-  dplyr::select(state, activity_group, year, workers_ha) %>%
-  tidyr::pivot_wider(names_from=c(activity_group, year),
-                     values_from=workers_ha)
+labor_intensity_national <- df_census_state %>%
+  dplyr::filter(
+    area_group     ==   "total",
+    activity_group %in% c("cattle", "temp_crop"),
+    day_group      ==   "total"
+    ) %>%
+  dplyr::select(
+    activity_group, year, activity_area, workers
+    ) %>%
+  dplyr::group_by(
+    activity_group,
+    year
+    ) %>%
+  dplyr::summarise(
+    activity_area = sum(activity_area, na.rm=TRUE),
+    workers       = sum(workers,       na.rm=TRUE),
+    .groups = "drop"
+  ) %>%
+  dplyr::transmute(
+    state = "Brazil",
+    activity_group,
+    year,
+    workers_per_ha = workers/activity_area
+  ) %>%
+  tidyr::pivot_wider(
+    names_from  = c(activity_group, year),
+    values_from = workers_per_ha
+  ) %>%
+  dplyr::select(
+    state, cattle_1995, temp_crop_1995, cattle_2006, temp_crop_2006, cattle_2017, temp_crop_2017
+  )
 
 # bind and order columns
-table_wph <- base::rbind(labor_intensity_state, labor_intensity_national) %>%
-  dplyr::select(state,
-                cattle_1995, temp_crop_1995,
-                cattle_2006, temp_crop_2006,
-                cattle_2017, temp_crop_2017)
+table_wph <- base::rbind(labor_intensity_state, labor_intensity_national)
 
 # generate table
 table_wph %>%
@@ -590,23 +594,37 @@ rm(labor_intensity_state, labor_intensity_national)
 
 ```
 
-Since we are working with plots much larger than 1 hectare, at the cell level we have
+When working at the 1km resolution, we have
 
-```{r labor_intensity_plots, echo=FALSE}
+```{r labor_intensity_plots_1km, echo=FALSE}
 
-if (param_plot_km == 1) {
-  # get values per 100 hectares (1 sq km)
-  table_wph[,2:7] <- table_wph[,2:7]*100
-} else if (param_plot_km == 5) {
-  # get values per 2500 hectares (25 sq km)
-  table_wph[,2:7] <- table_wph[,2:7]*2500
-}
+# get values per 100 hectares (1 sq km)
+table_wph[,2:7] <- table_wph[,2:7]*100
 
 # generate table
 table_wph %>%
   kableExtra::kable(col.names=c("Area", "Cattle", "Crops", "Cattle", "Crops", "Cattle", "Crops"),
                     digits=4,
-                    caption=paste0("Workers per Plot (",param_plot_km,"km x ",param_plot_km,"km) by Sector")) %>%
+                    caption=paste0("Workers per Plot (1km x 1km) by activity")) %>%
+  kableExtra::add_header_above(c(" "=1, "1995"=2, "2006"=2, "2017"=2)) %>%
+  kableExtra::kable_styling(bootstrap_options = c("striped", "hover", "condensed"),
+                            full_width=FALSE) %>%
+  kableExtra::row_spec(nrow(table_wph),bold=TRUE)
+
+```
+
+When working at the 5km resolution, we have
+
+```{r labor_intensity_plots_5km, echo=FALSE}
+
+# get values per 2500 hectares (25 sq km)
+table_wph[,2:7] <- table_wph[,2:7]*25
+
+# generate table
+table_wph %>%
+  kableExtra::kable(col.names=c("Area", "Cattle", "Crops", "Cattle", "Crops", "Cattle", "Crops"),
+                    digits=4,
+                    caption=paste0("Workers per Plot (5km x 5km) by activity")) %>%
   kableExtra::add_header_above(c(" "=1, "1995"=2, "2006"=2, "2017"=2)) %>%
   kableExtra::kable_styling(bootstrap_options = c("striped", "hover", "condensed"),
                             full_width=FALSE) %>%
@@ -615,370 +633,448 @@ table_wph %>%
 rm(table_wph)
 ```
 
-
 # Land Concentration
 
 Using data from IBGE's Census of Agriculture (available for 1995, 2006, and 2017) at the state level, I calculate the share of farm area in each of the following area classes:
 - less than 100 hectares;
 - from 100 to 1000 hectares;
 - more than 1000 hectares.
-This data is available at the state level, but I also provide results for the whole country
+This data is available at the state level, but I also provide results for the whole country.
+
+Since IBGE omits data whenever there are too few farms in an area class, I correct the tables to establish a minimum area threshold for farms in each area class - for instance, if a municipality has one single farm with more than 1000 hectares and its area is registered as zero, I consider this farm to have 1000 hectares. These artificial lower bounds ensure that land concentration figures make sense. This issue only shows up in SE, PE, AL, CE, PB, RN, PR and RJ in 2017, so this shouldn't be a problem for the Cerrado or the Amazon, but this manipulation slightly changes the country-level land concentration measures.
 
 ```{r land_concentration_all_years, echo=FALSE}
 
-# labels size class
-size_class_labels <- c(
-  "less_than_100_ha"    = "< 100 ha",
-  "from_100_to_1000_ha" = "100–1000 ha",
-  "more_than_1000_ha"   = "> 1000 ha"
-)
+# get state-level data on farm number and farm area by area group
+farm_area <- df_census_state %>%
+  dplyr::filter(
+    activity_group ==   "total",
+    day_group      ==   "total",
+    area_group     %in% c("under100ha", "from100to1kha", "over1kha", "total")
+  ) %>%
+  dplyr::select(
+    state, year, area_group,
+    farm_area_ha, n_farms
+  ) %>%
+  dplyr::mutate(
+    avg_area = farm_area_ha/n_farms
+  )
 
-# helper function to compute shares from a raw area/farms table
-get_shares <- function(df, states) {
-  df <- df %>%
-    dplyr::filter(state %in% states) %>%
-    dplyr::group_by(year) %>%
-    dplyr::summarise(less_than_100_ha    = sum(less_than_100_ha,    na.rm=TRUE),
-                     from_100_to_1000_ha = sum(from_100_to_1000_ha, na.rm=TRUE),
-                     more_than_1000_ha   = sum(more_than_1000_ha,   na.rm=TRUE),
-                     total               = sum(total,               na.rm=TRUE)) %>%
-    dplyr::ungroup() %>%
-    dplyr::transmute(year,
-                     less_than_100_ha    = 100 * less_than_100_ha    / total,
-                     from_100_to_1000_ha = 100 * from_100_to_1000_ha / total,
-                     more_than_1000_ha   = 100 * more_than_1000_ha   / total)
-    return(df)
-} # closes get_share()
-
-# helper function to build wide table (states as rows, year-class as columns)
-build_wide <- function(df_list) {
-  # df_list: named list of per-state/national share tables
-  base::do.call(base::rbind, lapply(base::names(df_list), function(nm) {
-    df_list[[nm]] %>%
-      tidyr::pivot_longer(cols = less_than_100_ha:more_than_1000_ha,
-                          names_to  = "size_class",
-                          values_to = "value") %>%
-      tidyr::pivot_wider(names_from  = c(size_class, year),
-                         values_from = value) %>%
-      dplyr::mutate(area = nm)
-  })) %>%
-    dplyr::select(
-      area,
-      less_than_100_ha_1985,    from_100_to_1000_ha_1985,    more_than_1000_ha_1985,
-      less_than_100_ha_1995,    from_100_to_1000_ha_1995,    more_than_1000_ha_1995,
-      less_than_100_ha_2006,    from_100_to_1000_ha_2006,    more_than_1000_ha_2006,
-      less_than_100_ha_2017,    from_100_to_1000_ha_2017,    more_than_1000_ha_2017
+# fix 'farm_area_ha' for each area group
+farm_under100ha    <- farm_area %>% dplyr::filter(area_group=="under100ha")    # no issues
+farm_from100to1kha <- farm_area %>% dplyr::filter(area_group=="from100to1kha") # no issues
+farm_over1kha      <- farm_area %>% dplyr::filter(area_group=="over1kha") # 8 rows with avg_area lower than 1kha
+# the problematic rows are for SE, PE, AL, CE, PB, RN, PR, and RJ in 2017
+farm_over1kha$farm_area_ha[farm_over1kha$avg_area<1000] <- 1000*farm_over1kha$n_farms[farm_over1kha$avg_area<1000]
+farm_over1kha$avg_area <- farm_over1kha$farm_area_ha / farm_over1kha$n_farms
+# get farm_total
+farm_total <- farm_area %>% 
+  dplyr::filter(area_group=="total") %>%
+  dplyr::select(state, year) %>%
+  dplyr::left_join(farm_under100ha,    by=join_by(state, year)) %>%
+  dplyr::left_join(farm_from100to1kha, by=join_by(state, year)) %>%
+  dplyr::left_join(farm_over1kha,      by=join_by(state, year)) %>%
+  dplyr::transmute(
+    state, year,
+    area_group   = "total",
+    farm_area_ha = farm_area_ha.x + farm_area_ha.y + farm_area_ha,
+    n_farms      = n_farms.x + n_farms.y + n_farms,
+    avg_area     = farm_area_ha / n_farms
     )
-} # close build_wide()
+# join everything back
+farm_area <- rbind(
+  farm_under100ha,
+  farm_from100to1kha,
+  farm_over1kha,
+  farm_total
+  ) %>%
+  dplyr::select(-avg_area)
+# add a final row for the whole country
+farm_area_brazil <- farm_area %>%
+  dplyr::select(-state) %>%
+  dplyr::group_by(year, area_group) %>%
+  dplyr::summarise(farm_area_ha = sum(farm_area_ha, na.rm=TRUE),
+                   n_farms      = sum(n_farms, na.rm=TRUE),
+                   .groups = "drop") %>%
+  dplyr::transmute(state="Brazil", year, area_group, farm_area_ha, n_farms)
+# join and clean up
+farm_area <- rbind(farm_area, farm_area_brazil)
+rm(farm_under100ha, farm_from100to1kha,
+   farm_over1kha, farm_total, farm_area_brazil)
 
-# Table 1) area shares
-area_by_state <- lapply(cerrado_states, function(s) get_shares(farm_area_by_class, s))
-base::names(area_by_state) <- cerrado_states
-area_national    <- list("Brazil" = get_shares(farm_area_by_class, unique(farm_area_by_class$state)))
-area_wide        <- build_wide(c(area_by_state, area_national))
-
-area_wide %>%
-  kableExtra::kable(col.names=c("Area",
-                                "<100", "100-1000", ">1000",
-                                "<100", "100-1000", ">1000",
-                                "<100", "100-1000", ">1000",
-                                "<100", "100-1000", ">1000"),
-                    digits=1,
-                    caption="Share of total farm area (%) by size class") %>%
-  kableExtra::add_header_above(c(" "=1, "1985"=3, "1995"=3, "2006"=3, "2017"=3)) %>%
-  kableExtra::kable_styling(bootstrap_options = c("stripend", "hover", "condensed"),
-                            full_width=FALSE) %>%
-  kableExtra::row_spec(nrow(area_wide),bold=TRUE)
-
-# Table 2) farm count shares
-farms_by_state <- lapply(cerrado_states, function(s) get_shares(farm_number_by_class, s))
-base::names(farms_by_state) <- cerrado_states
-farms_national   <- list("Brazil" = get_shares(farm_number_by_class, unique(farm_number_by_class$state)))
-farms_wide       <- build_wide(c(farms_by_state, farms_national))
-
-farms_wide %>%
-  kableExtra::kable(col.names=c("Area",
-                                "<100", "100-1000", ">1000",
-                                "<100", "100-1000", ">1000",
-                                "<100", "100-1000", ">1000",
-                                "<100", "100-1000", ">1000"),
-                    digits=1,
-                    caption="Share of total farm count (%) by size class") %>%
-  kableExtra::add_header_above(c(" "=1, "1985"=3, "1995"=3, "2006"=3, "2017"=3)) %>%
-  kableExtra::kable_styling(bootstrap_options = c("striped","hover","condensed"),
-                            full_width=FALSE) %>%
-  kableExtra::row_spec(nrow(farms_wide), bold=TRUE)
-
-# Plot 1) stacked bar chart
-# national area shares by size class (19985, 1995, 2006, 2017)
-chart_data <- farm_area_by_class %>%
-  dplyr::group_by(year) %>%
-  dplyr::summarise(less_than_100_ha    = sum(less_than_100_ha,    na.rm=TRUE),
-                   from_100_to_1000_ha = sum(from_100_to_1000_ha, na.rm=TRUE),
-                   more_than_1000_ha   = sum(more_than_1000_ha,   na.rm=TRUE),
-                   total               = sum(total,               na.rm=TRUE)) %>%
+# get share of farm areas
+area_shares <- farm_area %>%
+  dplyr::filter(
+    area_group != "total",
+    state %in% c(report_states, "Brazil")
+    ) %>%
+  dplyr::group_by(state, year) %>%
+  dplyr::mutate(share_area = 100 * farm_area_ha / sum(farm_area_ha)) %>%
   dplyr::ungroup() %>%
-  dplyr::transmute(year,
-                  `< 100 ha`       = 100 * less_than_100_ha    / total,
-                  `100–1000 ha`    = 100 * from_100_to_1000_ha / total,
-                  `> 1000 ha`      = 100 * more_than_1000_ha   / total) %>%
-  tidyr::pivot_longer(cols = -year,
-                      names_to  = "size_class",
-                      values_to = "share") %>%
-  dplyr::mutate(size_class = factor(size_class,
-                                    levels = c("< 100 ha", "100–1000 ha", "> 1000 ha")))
+  dplyr::select(state, year, area_group, share_area) %>%
+  tidyr::pivot_wider(
+    names_from  = c(area_group, year),
+    values_from = share_area
+  )
 
-g_land_concentration <- chart_data %>%
-  ggplot(aes(x=year, y=share, fill=size_class)) +
-  geom_bar(stat = "identity", position = "stack", width = 0.5) +
-  scale_fill_manual(values = c("< 100 ha"    = "#a6cee3",
-                               "100–1000 ha" = "#1f78b4",
-                               "> 1000 ha"   = "#081d58")) +
-  scale_y_continuous(limits = c(0, 100),
-                     breaks = seq(0, 100, 20),
-                     labels = function(x) paste0(x, "%")) +
-  labs(title   = "National farm area by size class",
-       x       = "Census year",
-       y       = "Share of total farmland area",
-       fill    = "Size class") +
+# get shares of farm count
+farm_shares <- farm_area %>%
+  dplyr::filter(
+    area_group != "total",
+    state %in% c(report_states, "Brazil")
+    ) %>%
+  dplyr::group_by(state, year) %>%
+  dplyr::mutate(share_farms = 100 * n_farms / sum(n_farms)) %>%
+  dplyr::ungroup() %>%
+  dplyr::select(state, year, area_group, share_farms) %>%
+  tidyr::pivot_wider(
+    names_from  = c(area_group, year),
+    values_from = share_farms
+  )
+
+# Table 1)
+area_shares %>%
+  kable(
+    digits  = 1,
+    caption = "Share of total farm area (%) by size class",
+    col.names = c("State", rep(c("<100", "100–1000", ">1000"), 4))
+  ) %>%
+  kable_styling(bootstrap_options = c("striped", "hover", "condensed")) %>%
+  add_header_above(c(" " = 1, "1985" = 3, "1995" = 3, "2006" = 3, "2017" = 3)) %>%
+  kableExtra::row_spec(nrow(area_shares),bold=TRUE)
+
+# Table 2)
+farm_shares %>%
+  kable(
+    digits  = 1,
+    caption = "Share of farms (%) by size class",
+    col.names = c("State", rep(c("<100", "100–1000", ">1000"), 4))
+  ) %>%
+  kable_styling(bootstrap_options = c("striped", "hover", "condensed")) %>%
+  add_header_above(c(" " = 1, "1985" = 3, "1995" = 3, "2006" = 3, "2017" = 3)) %>%
+  kableExtra::row_spec(nrow(farm_shares),bold=TRUE)
+
+
+# Plot) stacked bar chart
+plot_brazil_land_concentration <- area_shares %>%
+  dplyr::filter(state == "Brazil") %>%
+  tidyr::pivot_longer(
+    cols      = -state,
+    names_to  = c("area_group", "year"),
+    names_sep = "_",
+    values_to = "share_area"
+  ) %>%
+  dplyr::mutate(
+    year = as.numeric(year),
+    area_group = factor(area_group,
+                        levels = c("under100ha", "from100to1kha","over1kha"),
+                        labels = c("<100",       "100-1000",     ">1000"))
+  ) %>%
+  ggplot(aes(x = factor(year), y = share_area, fill = area_group)) +
+  geom_col() +
+  scale_y_continuous(labels = scales::percent_format(scale = 1)) +
+  scale_fill_manual(values = c("<100"      = "#a8d1e7",
+                                "100-1000" = "#2a8db5",
+                                ">1000"    = "#0d2d6b")) +
+  labs(title = "National farm area by size class",
+       x     = "Census year",
+       y     = "Share of total farmland area",
+       fill  = "Size class") +
   theme_minimal()
 
-gridExtra::grid.arrange(g_land_concentration)
+gridExtra::grid.arrange(plot_brazil_land_concentration)
 
-save_fig(g_land_concentration,"Brazil_land_concentration")
+save_fig(plot_brazil_land_concentration,"Brazil_land_concentration")
 
 # clean up
-rm(area_by_state, area_national, area_wide,
-   farms_by_state, farms_national, farms_wide,
-   get_shares, build_wide,
-   chart_data, g_land_concentration)
+rm(farm_area, area_shares, farm_shares, plot_brazil_land_concentration)
   
 ```
 
 The 2017 Census of Agriculture has more classes of farm size, so we can take a more detailed look in that year:
 
 ```{r land_concentration_2017, echo=FALSE}
-# correct for the "landless" category in the 2017 census
-# for the area table, we just need to remove the "landless" column (area is 0 anyway)
-area_table_2017 <- farm_area_by_class_2017 %>%
-  dplyr::select(state, less_than_100_ha, from_100_to_1000_ha, from_1000_to_2500_ha,
-                from_2500_to_10000_ha, more_than_10000_ha, total)
-# for the farm number table, we also need to recalculate the total number of farms
-farm_table_2017 <- farm_number_by_class_2017 %>%
-  dplyr::transmute(state, less_than_100_ha, from_100_to_1000_ha, from_1000_to_2500_ha, from_2500_to_10000_ha, more_than_10000_ha,
-                   total = less_than_100_ha+from_100_to_1000_ha+from_1000_to_2500_ha+from_2500_to_10000_ha+more_than_10000_ha)
+# get state-level data on farm number and farm area by area group
+farm_area <- df_census_state %>%
+  dplyr::filter(
+    activity_group ==   "total",
+    day_group      ==   "total",
+    year           ==   2017,
+    area_group     %in% c("under100ha", "from100to1kha", "from1kto2500ha", "from2500to10kha", "over10kha", "total")
+  ) %>%
+  dplyr::select(
+    state, area_group,
+    farm_area_ha, n_farms
+  ) %>%
+  dplyr::mutate(
+    avg_area = farm_area_ha/n_farms
+  )
 
-# helper function to compute shares from 2017 raw area/farms table
-get_shares <- function(df, states) {
-  df <- df %>%
-    dplyr::filter(state %in% states) %>%
-    dplyr::summarise(less_than_100_ha      = sum(less_than_100_ha,      na.rm=TRUE),
-                     from_100_to_1000_ha   = sum(from_100_to_1000_ha,   na.rm=TRUE),
-                     from_1000_to_2500_ha  = sum(from_1000_to_2500_ha,  na.rm=TRUE),
-                     from_2500_to_10000_ha = sum(from_2500_to_10000_ha, na.rm=TRUE),
-                     more_than_10000_ha    = sum(more_than_10000_ha,     na.rm=TRUE),
-                     total                 = sum(total,                  na.rm=TRUE)) %>%
-    dplyr::transmute(less_than_100_ha      = 100 * less_than_100_ha      / total,
-                     from_100_to_1000_ha   = 100 * from_100_to_1000_ha   / total,
-                     from_1000_to_2500_ha  = 100 * from_1000_to_2500_ha  / total,
-                     from_2500_to_10000_ha = 100 * from_2500_to_10000_ha / total,
-                     more_than_10000_ha    = 100 * more_than_10000_ha     / total)
-  return(df)
-} # closes get_shares()
+# fix 'farm_area_ha' for each area group
+farm_under100ha      <- farm_area %>% dplyr::filter(area_group=="under100ha")      # no issues
+farm_from100to1kha   <- farm_area %>% dplyr::filter(area_group=="from100to1kha")   # no issues
+farm_from1kto2500ha  <- farm_area %>% dplyr::filter(area_group=="from1kto2500ha")  #  9 rows with avg_area < 1kha
+farm_from2500to10kha <- farm_area %>% dplyr::filter(area_group=="from2500to10kha") # 12 rows with avg_area < 10kha
+farm_over10kha       <- farm_area %>% dplyr::filter(area_group=="over10kha")       # 19 rows with avg_area < 10kha
+farm_over10kha$avg_area[farm_over10kha$state=="SE"] <- 0
+farm_over10kha$avg_area[farm_over10kha$state=="DF"] <- 0
+# fix problematic rows
+farm_from1kto2500ha$farm_area_ha[farm_from1kto2500ha$avg_area<1000] <- 1000*farm_from1kto2500ha$n_farms[farm_from1kto2500ha$avg_area<1000]
+farm_from2500to10kha$farm_area_ha[farm_from2500to10kha$avg_area<2500] <- 2500*farm_from2500to10kha$n_farms[farm_from2500to10kha$avg_area<2500]
+farm_over10kha$farm_area_ha[farm_over10kha$avg_area<10000] <- 10000*farm_over10kha$n_farms[farm_over10kha$avg_area<10000]
 
-# helper function to build wide table (states as rows, year-class as columns)
-build_wide <- function(df, states) {
-  all_states <- unique(df$state)
-  # state rows
-  state_rows <- lapply(states, function(s) {
-    get_shares(df, s) %>%
-      dplyr::mutate(area = s, .before = 1)
-  })
-  # national row
-  national_row <- get_shares(df, all_states) %>%
-    dplyr::mutate(area = "Brazil (national)", .before = 1)
-  # bind
-  base::do.call(base::rbind, c(state_rows, list(national_row)))
-}
+farm_from1kto2500ha$avg_area  <- farm_from1kto2500ha$farm_area_ha / farm_from1kto2500ha$n_farms
+farm_from2500to10kha$avg_area <- farm_from2500to10kha$farm_area_ha / farm_from2500to10kha$n_farms
+farm_over10kha$avg_area       <- farm_over10kha$farm_area_ha / farm_over10kha$n_farms
 
-# Table 1) area shares
-area_wide <- build_wide(area_table_2017, cerrado_states)
-area_wide %>%
-  kableExtra::kable(col.names=c("Area","< 100 ha","100–1000 ha","1000–2500 ha","2500–10000 ha","> 10000 ha"),
-                    digits=1,
-                    caption="Share of total farm area (%) by size class (2017)") %>%
-  kableExtra::kable_styling(bootstrap_options = c("striped", "hover", "condensed"),
-                            full_width=FALSE) %>%
-  kableExtra::row_spec(nrow(area_wide),bold=TRUE)
+# get farm_total
+farm_total <- farm_area %>% 
+  dplyr::filter(area_group=="total") %>%
+  dplyr::select(state) %>%
+  dplyr::left_join(farm_under100ha,      by="state") %>%
+  dplyr::left_join(farm_from100to1kha,   by="state") %>%
+  dplyr::left_join(farm_from1kto2500ha,  by="state") %>%
+  dplyr::left_join(farm_from2500to10kha, by="state") %>%
+  dplyr::left_join(farm_over10kha,       by="state") %>%
+  dplyr::transmute(
+    state,
+    area_group   = "total",
+    farm_area_ha = farm_area_ha + farm_area_ha.x + farm_area_ha.x.x + farm_area_ha.y + farm_area_ha.y.y,
+    n_farms      = n_farms + n_farms.x + n_farms.x.x + n_farms.y + n_farms.y.y,
+    avg_area     = farm_area_ha / n_farms
+    )
+# join everything back
+farm_area <- rbind(
+  farm_under100ha,
+  farm_from100to1kha,
+  farm_from1kto2500ha,
+  farm_from2500to10kha,
+  farm_over10kha,
+  farm_total
+  ) %>%
+  dplyr::select(-avg_area)
+# add a final row for the whole country
+farm_area_brazil <- farm_area %>%
+  dplyr::select(-state) %>%
+  dplyr::group_by(area_group) %>%
+  dplyr::summarise(farm_area_ha = sum(farm_area_ha, na.rm=TRUE),
+                   n_farms      = sum(n_farms, na.rm=TRUE),
+                   .groups = "drop") %>%
+  dplyr::transmute(state="Brazil", area_group, farm_area_ha, n_farms)
+# join and clean up
+farm_area <- rbind(farm_area, farm_area_brazil)
+rm(farm_under100ha, farm_from100to1kha, farm_from1kto2500ha,
+  farm_from2500to10kha, farm_over10kha, farm_total, farm_area_brazil)
 
-# Table 2) farm count shares
-farms_wide <- build_wide(farm_table_2017, cerrado_states)
-farms_wide %>%
-  kableExtra::kable(col.names=c("Area","< 100 ha","100–1000 ha","1000–2500 ha","2500–10000 ha","> 10000 ha"),
-                    digits=1,
-                    caption="Share of total farm count (%) by size class (2017)") %>%
-  kableExtra::kable_styling(bootstrap_options = c("striped", "hover", "condensed"),
-                            full_width = FALSE) %>%
-  kableExtra::row_spec(nrow(farms_wide),bold=TRUE)
+# get share of farm areas
+area_shares <- farm_area %>%
+  dplyr::filter(
+    area_group != "total",
+    state %in% c(report_states, "Brazil")
+    ) %>%
+  dplyr::group_by(state) %>%
+  dplyr::mutate(share_area = 100 * farm_area_ha / sum(farm_area_ha)) %>%
+  dplyr::ungroup() %>%
+  dplyr::select(state, area_group, share_area) %>%
+  tidyr::pivot_wider(
+    names_from  = area_group,
+    values_from = share_area
+  )
 
+# get shares of farm count
+farm_shares <- farm_area %>%
+  dplyr::filter(
+    area_group != "total",
+    state %in% c(report_states, "Brazil")
+    ) %>%
+  dplyr::group_by(state) %>%
+  dplyr::mutate(share_farms = 100 * n_farms / sum(n_farms)) %>%
+  dplyr::ungroup() %>%
+  dplyr::select(state, area_group, share_farms) %>%
+  tidyr::pivot_wider(
+    names_from  = area_group,
+    values_from = share_farms
+  )
+
+# Table 1)
+area_shares %>%
+  kable(
+    digits  = 1,
+    caption = "Share of total farm area (%) by size class, 2017",
+    col.names = c("State", "<100", "100-1000", "1000-2500", "2500-10000", ">10000")
+  ) %>%
+  kable_styling(bootstrap_options = c("striped", "hover", "condensed")) %>%
+  kableExtra::row_spec(nrow(area_shares),bold=TRUE)
+
+# Table 2)
+farm_shares %>%
+  kable(
+    digits  = 1,
+    caption = "Share of farms (%) by size class, 2017",
+    col.names = c("State", "<100", "100-1000", "1000-2500", "2500-10000", ">10000")
+  ) %>%
+  kable_styling(bootstrap_options = c("striped", "hover", "condensed")) %>%
+  kableExtra::row_spec(nrow(farm_shares),bold=TRUE)
 
 # clean up
-rm(get_shares, build_wide,
-   area_wide, farms_wide)
+rm(farm_area, area_shares, farm_shares)
 
 ```
 
-We can use this data to get rough estimates for the values of parameters `share_smallprod`, `share_mediumprod`, `share_largeprod`, `ratio_medium_to_small`, and `ratio_large_to_small`. If the cell grid has 1km resolution, each cell has 100 hectares and we can initialize the model with values from 1985, 1995, 2006 or 2017 with no issues. If the cell grid has 5km resolution, each cell has 2500 hectares and only the 2017 data has a 1-1 relation with AgriCerrado's grid structure - we can still use the data from 1985, 1995 or 2006, but we must be aware that this is a gross approximation.
+
 
 ```{r land_concentration_parameters, echo=FALSE}
+
+#We can use this data to get rough estimates for the values of parameters `share_smallprod`, `share_mediumprod`, `share_largeprod`, `ratio_medium_to_small`, and `ratio_large_to_small`. If the cell grid has 1km resolution, each cell has 100 hectares and we can initialize the model with values from 1985, 1995, 2006 or 2017 with no issues. If the cell grid has 5km resolution, each cell has 2500 hectares and only the 2017 data has a 1-1 relation with AgriCerrado's grid structure - we can still use the data from 1985, 1995 or 2006, but we must be aware that this is a gross approximation.
+
 # helper function to compute the 5 parameters for a given set of states and year
 # small  = <100ha
 # medium = 100-1000ha
 # large  = >1000ha
 
-get_params_3class <- function(states, yr) {
-  farm_number <- farm_number_by_class %>%
-    dplyr::filter(state %in% states, year==yr) %>%
-    dplyr::summarise(small  = sum(less_than_100_ha,    na.rm=TRUE),
-                     medium = sum(from_100_to_1000_ha, na.rm=TRUE),
-                     large  = sum(more_than_1000_ha,   na.rm=TRUE),
-                     total  = sum(total,               na.rm=TRUE))
-  
-  farm_area <- farm_area_by_class %>%
-    dplyr::filter(state %in% states, year==yr) %>%
-    dplyr::summarise(small  = sum(less_than_100_ha,    na.rm=TRUE),
-                     medium = sum(from_100_to_1000_ha, na.rm=TRUE),
-                     large  = sum(more_than_1000_ha,   na.rm=TRUE))
-  
-  data.frame(share_small  = 100 * farm_number$small  / farm_number$total,
-             share_medium = 100 * farm_number$medium / farm_number$total,
-             share_large  = 100 * farm_number$large  / farm_number$total,
-             avg_small    = farm_area$small  / farm_number$small,
-             avg_medium   = farm_area$medium / farm_number$medium,
-             avg_large    = farm_area$large  / farm_number$large)
-  
-} # close get_params_3class()
-
-# helper function to compute the 5 parameters for a given set of states and year
-# small  = <2500ha
-# medium = 2500-10000ha
-# large  = >10000ha
-get_params_5class <- function(states) {
-  farm_number <- farm_table_2017 %>%
-    dplyr::filter(state %in% states) %>%
-    dplyr::summarise(small  = sum(less_than_100_ha, na.rm=TRUE) +
-                              sum(from_100_to_1000_ha, na.rm=TRUE) +
-                              sum(from_1000_to_2500_ha, na.rm=TRUE),
-                     medium = sum(from_2500_to_10000_ha, na.rm=TRUE),
-                     large  = sum(more_than_10000_ha, na.rm=TRUE),
-                     total  = sum(total, na.rm=TRUE))
-  
-  farm_area <- area_table_2017 %>%
-    dplyr::filter(state %in% states) %>%
-    dplyr::summarise(small  = sum(less_than_100_ha, na.rm=TRUE) +
-                              sum(from_100_to_1000_ha, na.rm=TRUE) +
-                              sum(from_1000_to_2500_ha, na.rm=TRUE),
-                     medium = sum(from_2500_to_10000_ha, na.rm=TRUE),
-                     large  = sum(more_than_10000_ha, na.rm=TRUE))
-  
-  data.frame(share_small  = 100 * farm_number$small  / farm_number$total,
-             share_medium = 100 * farm_number$medium / farm_number$total,
-             share_large  = 100 * farm_number$large  / farm_number$total,
-             avg_small    = farm_area$small  / farm_number$small,
-             avg_medium   = farm_area$medium / farm_number$medium,
-             avg_large    = farm_area$large  / farm_number$large)
-    
-} # closes get_params_5class()
-
-# Table 1) Land Concentration (3 classes - 1985, 1995, 2006 and 2017)
-# build wide table
-years_3class <- c("1985", "1995", "2006", "2017")
-# process data
-rows_3class <- lapply(c(cerrado_states, "Brazil"), function(s) {
-  states <- if (s == "Brazil") unique(farm_number_by_class$state) else s
-  year_cols <- lapply(years_3class, function(yr) {
-    df <- get_params_3class(states, yr)
-    # rename columns to include year suffix before cbind
-    names(df) <- paste0(names(df), "_", yr)
-    df
-  })
-  result <- base::do.call(cbind, year_cols)
-  result$area <- if (s == "Brazil") "Brazil (national)" else s
-  result <- result %>% dplyr::select(area, dplyr::everything())
-  result
-})
-# create final df
-table_3class <- base::do.call(base::rbind, rows_3class)
-# generate table for report
-# Table 1a) Land Concentration (3 classes - 1985 and 1995)
-table_3class %>%
-  dplyr::select(area,
-                ends_with("_1985"),
-                ends_with("_1995")) %>%
-  kableExtra::kable(
-    col.names = c("Area",
-                  rep(c("Small (%)", "Medium (%)", "Large (%)",
-                        "Avg. small (ha)", "Avg. medium (ha)", "Avg. large (ha)"), 2)),
-    digits  = 1,
-    caption = "Land concentration parameters (small <100 ha, medium 100–1000 ha, large >1000 ha) — part 1/2"
-  ) %>%
-  kableExtra::add_header_above(c(" " = 1, "1985" = 6, "1995" = 6)) %>%
-  kableExtra::kable_styling(bootstrap_options = c("striped","hover","condensed"),
-                            full_width = FALSE) %>%
-  kableExtra::row_spec(nrow(table_3class), bold = TRUE)
-
-# Table 1b) Land Concentration (3 classes - 2006 and 2017)
-table_3class %>%
-  dplyr::select(area,
-                ends_with("_2006"),
-                ends_with("_2017")) %>%
-  kableExtra::kable(
-    col.names = c("Area",
-                  rep(c("Small (%)", "Medium (%)", "Large (%)",
-                        "Avg. small (ha)", "Avg. medium (ha)", "Avg. large (ha)"), 2)),
-    digits  = 1,
-    caption = "Land concentration parameters (small <100 ha, medium 100–1000 ha, large >1000 ha) — part 2/2"
-  ) %>%
-  kableExtra::add_header_above(c(" " = 1, "2006" = 6, "2017" = 6)) %>%
-  kableExtra::kable_styling(bootstrap_options = c("striped","hover","condensed"),
-                            full_width = FALSE) %>%
-  kableExtra::row_spec(nrow(table_3class), bold = TRUE)
-
+#get_params_3class <- function(states, yr) {
+#  farm_number <- farm_number_by_class %>%
+#    dplyr::filter(state %in% states, year==yr) %>%
+#    dplyr::summarise(small  = sum(less_than_100_ha,    na.rm=TRUE),
+#                     medium = sum(from_100_to_1000_ha, na.rm=TRUE),
+#                     large  = sum(more_than_1000_ha,   na.rm=TRUE),
+#                     total  = sum(total,               na.rm=TRUE))
+#  
+#  farm_area <- farm_area_by_class %>%
+#    dplyr::filter(state %in% states, year==yr) %>%
+#    dplyr::summarise(small  = sum(less_than_100_ha,    na.rm=TRUE),
+#                     medium = sum(from_100_to_1000_ha, na.rm=TRUE),
+#                     large  = sum(more_than_1000_ha,   na.rm=TRUE))
+#  
+#  data.frame(share_small  = 100 * farm_number$small  / farm_number$total,
+#             share_medium = 100 * farm_number$medium / farm_number$total,
+#             share_large  = 100 * farm_number$large  / farm_number$total,
+#             avg_small    = farm_area$small  / farm_number$small,
+#             avg_medium   = farm_area$medium / farm_number$medium,
+#             avg_large    = farm_area$large  / farm_number$large)
+#  
+#} # close get_params_3class()
+#
+## helper function to compute the 5 parameters for a given set of states and year
+## small  = <2500ha
+## medium = 2500-10000ha
+## large  = >10000ha
+#get_params_5class <- function(states) {
+#  farm_number <- farm_table_2017 %>%
+#    dplyr::filter(state %in% states) %>%
+#    dplyr::summarise(small  = sum(less_than_100_ha, na.rm=TRUE) +
+#                              sum(from_100_to_1000_ha, na.rm=TRUE) +
+#                              sum(from_1000_to_2500_ha, na.rm=TRUE),
+#                     medium = sum(from_2500_to_10000_ha, na.rm=TRUE),
+#                     large  = sum(more_than_10000_ha, na.rm=TRUE),
+#                     total  = sum(total, na.rm=TRUE))
+#  
+#  farm_area <- area_table_2017 %>%
+#    dplyr::filter(state %in% states) %>%
+#    dplyr::summarise(small  = sum(less_than_100_ha, na.rm=TRUE) +
+#                              sum(from_100_to_1000_ha, na.rm=TRUE) +
+#                              sum(from_1000_to_2500_ha, na.rm=TRUE),
+#                     medium = sum(from_2500_to_10000_ha, na.rm=TRUE),
+#                     large  = sum(more_than_10000_ha, na.rm=TRUE))
+#  
+#  data.frame(share_small  = 100 * farm_number$small  / farm_number$total,
+#             share_medium = 100 * farm_number$medium / farm_number$total,
+#             share_large  = 100 * farm_number$large  / farm_number$total,
+#             avg_small    = farm_area$small  / farm_number$small,
+#             avg_medium   = farm_area$medium / farm_number$medium,
+#             avg_large    = farm_area$large  / farm_number$large)
+#    
+#} # closes get_params_5class()
+#
+## Table 1) Land Concentration (3 classes - 1985, 1995, 2006 and 2017)
+## build wide table
+#years_3class <- c("1985", "1995", "2006", "2017")
+## process data
+#rows_3class <- lapply(c(cerrado_states, "Brazil"), function(s) {
+#  states <- if (s == "Brazil") unique(farm_number_by_class$state) else s
+#  year_cols <- lapply(years_3class, function(yr) {
+#    df <- get_params_3class(states, yr)
+#    # rename columns to include year suffix before cbind
+#    names(df) <- paste0(names(df), "_", yr)
+#    df
+#  })
+#  result <- base::do.call(cbind, year_cols)
+#  result$area <- if (s == "Brazil") "Brazil (national)" else s
+#  result <- result %>% dplyr::select(area, dplyr::everything())
+#  result
+#})
+## create final df
+#table_3class <- base::do.call(base::rbind, rows_3class)
+## generate table for report
+## Table 1a) Land Concentration (3 classes - 1985 and 1995)
 #table_3class %>%
-#  kableExtra::kable(col.names = c("Area",
-#                                  rep(c("Small (%)", "Medium (%)", "Large (%)", "Avg. small (ha)", "Avg. medium (ha)", #"Avg. large (ha)"),4)),
-#                    digits  = 1,
-#                    caption = "Land concentration parameters (small <100 ha, medium 100–1000 ha, large >1000 ha)") %>%
-#  add_header_above(c(" " = 1,
-#                     "1985" = 6, "1995" = 6,
-#                     "2006" = 6, "2017" = 6)) %>%
-#  kable_styling(bootstrap_options = c("striped","hover","condensed"), full_width = FALSE) %>%
-#  row_spec(nrow(table_3class), bold = TRUE)
-
-# Table 2) Land Concentration (3 classes - 2017)
-# process data
-rows_5class <- lapply(c(cerrado_states, "Brazil"), function(s) {
-  states <- if (s == "Brazil") unique(farm_number_by_class_2017$state) else s
-  get_params_5class(states) %>%
-    dplyr::mutate(area = if (s == "Brazil") "Brazil (national)" else s,
-                  .before = 1)
-})
-# create final df
-table_5class <- base::do.call(base::rbind, rows_5class)
-# generate table for report
-table_5class %>%
-  kableExtra::kable(col.names=c("Area", "Small (%)", "Medium (%)", "Large (%)", "Avg. small (ha)", "Avg. medium (ha)", "Avg. large (ha)"),
-                    digits=1,
-                    caption="Land concentration parameters (small <2500 ha, medium 2500–10000 ha, large >10000 ha)") %>%
-  kableExtra::kable_styling(bootstrap_options = c("striped", "hover", "condensed"),
-                            full_width = FALSE) %>%
-  kableExtra::row_spec(nrow(table_5class), bold=TRUE)
-
-# clean up
-rm(get_params_3class, years_3class, rows_3class, table_3class,
-   get_params_5class, rows_5class, table_5class,
-   area_table_2017, farm_table_2017,
-   size_class_labels)
+#  dplyr::select(area,
+#                ends_with("_1985"),
+#                ends_with("_1995")) %>%
+#  kableExtra::kable(
+#    col.names = c("Area",
+#                  rep(c("Small (%)", "Medium (%)", "Large (%)",
+#                        "Avg. small (ha)", "Avg. medium (ha)", "Avg. large (ha)"), 2)),
+#    digits  = 1,
+#    caption = "Land concentration parameters (small <100 ha, medium 100–1000 ha, large >1000 ha) — part 1/2"
+#  ) %>%
+#  kableExtra::add_header_above(c(" " = 1, "1985" = 6, "1995" = 6)) %>%
+#  kableExtra::kable_styling(bootstrap_options = c("striped","hover","condensed"),
+#                            full_width = FALSE) %>%
+#  kableExtra::row_spec(nrow(table_3class), bold = TRUE)
+#
+## Table 1b) Land Concentration (3 classes - 2006 and 2017)
+#table_3class %>%
+#  dplyr::select(area,
+#                ends_with("_2006"),
+#                ends_with("_2017")) %>%
+#  kableExtra::kable(
+#    col.names = c("Area",
+#                  rep(c("Small (%)", "Medium (%)", "Large (%)",
+#                        "Avg. small (ha)", "Avg. medium (ha)", "Avg. large (ha)"), 2)),
+#    digits  = 1,
+#    caption = "Land concentration parameters (small <100 ha, medium 100–1000 ha, large >1000 ha) — part 2/2"
+#  ) %>%
+#  kableExtra::add_header_above(c(" " = 1, "2006" = 6, "2017" = 6)) %>%
+#  kableExtra::kable_styling(bootstrap_options = c("striped","hover","condensed"),
+#                            full_width = FALSE) %>%
+#  kableExtra::row_spec(nrow(table_3class), bold = TRUE)
+#
+##table_3class %>%
+##  kableExtra::kable(col.names = c("Area",
+##                                  rep(c("Small (%)", "Medium (%)", "Large (%)", "Avg. small (ha)", "Avg. medium (ha)", #"Avg. #large (ha)"),4)),
+##                    digits  = 1,
+##                    caption = "Land concentration parameters (small <100 ha, medium 100–1000 ha, large >1000 ha)") %>%
+##  add_header_above(c(" " = 1,
+##                     "1985" = 6, "1995" = 6,
+##                     "2006" = 6, "2017" = 6)) %>%
+##  kable_styling(bootstrap_options = c("striped","hover","condensed"), full_width = FALSE) %>%
+##  row_spec(nrow(table_3class), bold = TRUE)
+#
+## Table 2) Land Concentration (3 classes - 2017)
+## process data
+#rows_5class <- lapply(c(cerrado_states, "Brazil"), function(s) {
+#  states <- if (s == "Brazil") unique(farm_number_by_class_2017$state) else s
+#  get_params_5class(states) %>%
+#    dplyr::mutate(area = if (s == "Brazil") "Brazil (national)" else s,
+#                  .before = 1)
+#})
+## create final df
+#table_5class <- base::do.call(base::rbind, rows_5class)
+## generate table for report
+#table_5class %>%
+#  kableExtra::kable(col.names=c("Area", "Small (%)", "Medium (%)", "Large (%)", "Avg. small (ha)", "Avg. medium (ha)", "Avg. #large (ha)"),
+#                    digits=1,
+#                    caption="Land concentration parameters (small <2500 ha, medium 2500–10000 ha, large >10000 ha)") %>%
+#  kableExtra::kable_styling(bootstrap_options = c("striped", "hover", "condensed"),
+#                            full_width = FALSE) %>%
+#  kableExtra::row_spec(nrow(table_5class), bold=TRUE)
+#
+## clean up
+#rm(get_params_3class, years_3class, rows_3class, table_3class,
+#   get_params_5class, rows_5class, table_5class,
+#   area_table_2017, farm_table_2017,
+#   size_class_labels)
 
 ```
 
@@ -992,112 +1088,114 @@ This data is available at the state level, but I also provide results for the wh
 
 ```{r area_by_activity_type, echo=FALSE}
 
-# join permanent and temporary crops
-area_by_activity2 <- area_by_activity %>%
-  dplyr::transmute(state, cattle,
-                   crop = (perm_crop+temp_crop),
-                   forestry, other, total, year)
+# get state-level area by activity
+area_by_activity <- df_census_state %>%
+  dplyr::filter(
+    area_group ==   "total",
+    day_group  ==   "total",
+    year       %in% c(1995, 2006, 2017)
+    ) %>%
+  dplyr::select(
+    state, year, activity_group, activity_area
+  ) %>%
+  tidyr::pivot_wider(
+    names_from  = activity_group,
+    values_from = activity_area
+  ) %>%
+  dplyr::mutate(
+    crop  = perm_crop + temp_crop,
+    total = cattle + crop + forestry
+  ) 
 
-# helper function to compute shares from a raw activity/area table
-get_shares <- function(df, states) {
-  df <- df %>%
-    dplyr::filter(state %in% states) %>%
-    dplyr::group_by(year) %>%
-    dplyr::summarise(cattle   = sum(cattle,   na.rm=TRUE),
-                     crop     = sum(crop,     na.rm=TRUE),
-                     forestry = sum(forestry, na.rm=TRUE),
-                     other    = sum(other,    na.rm=TRUE),
-                     total    = sum(total,    na.rm=TRUE)) %>%
-    dplyr::ungroup() %>%
-    dplyr::transmute(year,
-                     cattle   = 100 * cattle   / total,
-                     crop     = 100 * crop     / total,
-                     forestry = 100 * forestry / total,
-                     other    = 100 * other    / total)
-    return(df)
-} # closes get_share()
+# get country-level area by activity
+area_by_activity_brazil <- area_by_activity %>%
+  dplyr::select(-state) %>%
+  dplyr::group_by(year) %>%
+  dplyr::summarise(
+    total     = sum(total, na.rm=TRUE),
+    cattle    = sum(cattle, na.rm=TRUE),
+    forestry  = sum(forestry, na.rm=TRUE),
+    perm_crop = sum(perm_crop, na.rm=TRUE),
+    temp_crop = sum(temp_crop, na.rm=TRUE),
+    crop      = sum(crop, na.rm=TRUE)
+  ) %>%
+  dplyr::transmute(
+    state = "Brazil",
+    year, total, cattle, forestry, perm_crop, temp_crop, crop
+  )
 
-# helper function to build wide table (states as rows, year-class as columns)
-build_wide <- function(df_list) {
-  # df_list: named list of per-state/national share tables
-  base::do.call(base::rbind, lapply(base::names(df_list), function(nm) {
-    df_list[[nm]] %>%
-      tidyr::pivot_longer(cols = cattle:other,
-                          names_to  = "activity_class",
-                          values_to = "value") %>%
-      tidyr::pivot_wider(names_from  = c(activity_class, year),
-                         values_from = value) %>%
-      dplyr::mutate(area = nm)
-  })) %>%
-    dplyr::select(
-      area,
-      cattle_1995, crop_1995, forestry_1995, other_1995,
-      cattle_2006, crop_2006, forestry_2006, other_2006,
-      cattle_2017, crop_2017, forestry_2017, other_2017)
-} # close build_wide()
+# join in a single table
+area_by_activity <- rbind(area_by_activity, area_by_activity_brazil)
+rm(area_by_activity_brazil)
 
-# Table 1) area shares
-activity_area_by_state <- lapply(cerrado_states, function(s) get_shares(area_by_activity2, s))
-base::names(activity_area_by_state) <- cerrado_states
-area_national    <- list("Brazil" = get_shares(area_by_activity2, unique(area_by_activity2$state)))
-area_wide        <- build_wide(c(activity_area_by_state, area_national))
-
-area_wide %>%
-  kableExtra::kable(col.names=c("Area",
-                                "Cattle", "Crop", "Forestry", "Other",
-                                "Cattle", "Crop", "Forestry", "Other",
-                                "Cattle", "Crop", "Forestry", "Other"),
-                    digits=1,
-                    caption="Share of total farm area (%) by activity class") %>%
-  kableExtra::add_header_above(c(" "=1, "1995"=4, "2006"=4, "2017"=4)) %>%
+# generate final table
+area_by_activity <- area_by_activity %>%
+  dplyr::transmute(
+    state, 
+    year,
+    cattle   = 100*cattle   / total,
+    crop     = 100*crop     / total,
+    forestry = 100*forestry / total
+  ) %>%
+  tidyr::pivot_longer(
+    cols      = cattle:forestry,
+    names_to  = "activity_class",
+    values_to = "value"
+  ) %>%
+  tidyr::pivot_wider(
+    names_from  = c(activity_class, year),
+    values_from = value
+  ) %>%
+  dplyr::filter(
+    state %in% c(report_states, "Brazil")
+  )
+  
+# Table) area shares
+area_by_activity %>%
+  kableExtra::kable(
+    digits = 1,
+    caption="Share of total farm area (%) by activity class",
+    col.names=c("State", rep(c("Cattle", "Crop", "Forestry"), 3)),
+    ) %>%
+  kableExtra::add_header_above(c(" "=1, "1995"=3, "2006"=3, "2017"=3)) %>%
   kableExtra::kable_styling(bootstrap_options = c("stripend", "hover", "condensed"),
                             full_width=FALSE) %>%
-  kableExtra::row_spec(nrow(area_wide),bold=TRUE)
+  kableExtra::row_spec(nrow(area_by_activity),bold=TRUE)
 
-# Plot 1) stacked bar chart
+# Plot) stacked bar chart
 # national area shares by size class (19985, 1995, 2006, 2017)
-chart_data <- area_by_activity2 %>%
-  dplyr::group_by(year) %>%
-  dplyr::summarise(cattle   = sum(cattle,   na.rm=TRUE),
-                   crop     = sum(crop,     na.rm=TRUE),
-                   forestry = sum(forestry, na.rm=TRUE),
-                   other    = sum(other,    na.rm=TRUE),
-                   total    = sum(total,    na.rm=TRUE)) %>%
-  dplyr::ungroup() %>%
-  dplyr::transmute(year,
-                   Cattle   = 100 * cattle   / total,
-                   Crop     = 100 * crop     / total,
-                   Forestry = 100 * forestry / total,
-                   Other    = 100 * other    / total ) %>%
-  tidyr::pivot_longer(cols = -year,
-                      names_to  = "activity_class",
-                      values_to = "share") %>%
-  dplyr::mutate(activity_class = factor(activity_class,
-                                        levels = c("Cattle", "Crop", "Forestry", "Other")))
-
-g_area_by_type <- chart_data %>%
-  ggplot(aes(x=year, y=share, fill=activity_class)) +
-  geom_bar(stat = "identity", position = "stack", width = 0.5) +
+plot_activity_area <- area_by_activity %>%
+  dplyr::filter(state=="Brazil") %>%
+  tidyr::pivot_longer(
+    cols = -state,
+    names_to  = c("activity_class","year"),
+    names_sep = "_",
+    values_to = "share"
+    ) %>%
+  dplyr::mutate(
+    year = as.numeric(year),
+    activity_class = factor(activity_class,
+                            levels = c("cattle", "crop", "forestry"),
+                            labels = c("Cattle", "Crop", "Forestry"))
+    ) %>%
+  ggplot(aes(x=factor(year), y=share, fill=activity_class)) +
+  geom_col() +
+  scale_y_continuous(labels = scales::percent_format(scale=1)) +
   scale_fill_manual(values = c("Cattle"   = "#edde8e",
                                "Crop"     = "#C27BA0",
-                               "Forestry" = "#1f8d49",
-                               "Other"    = "#d4271e")) +
-  scale_y_continuous(limits = c(0, 100),
-                     breaks = seq(0, 100, 20),
-                     labels = function(x) paste0(x, "%")) +
+                               "Forestry" = "#1f8d49")) +
   labs(title   = "National farm area by activity class",
        x       = "Census year",
        y       = "Share of total farmland area",
        fill    = "Activity class") +
   theme_minimal()
 
-gridExtra::grid.arrange(g_area_by_type)
+gridExtra::grid.arrange(plot_activity_area)
 
-save_fig(g_area_by_type,"Brazil_farmland_by_activity_census")
+save_fig(plot_activity_area,"Brazil_farmland_by_activity_census")
 
 # clean up
-rm(area_by_activity2, get_shares, build_wide, activity_area_by_state, 
-   area_national, area_wide, chart_data, g_area_by_type)
+rm(area_by_activity, plot_activity_area)
 
 ```
 
