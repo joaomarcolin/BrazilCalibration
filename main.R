@@ -85,7 +85,9 @@ readr::write_csv(df_brazil_mun, "data_outputs/2_brazil_mun/df_brazil_mun.csv")
 # data available at the state- and municipality-level for 1985, 1995, 2006 and 2017,
 # though some variables are not available for every year or every aggregation level
 source("scripts/census1_load_data.R")  # load agriculture census data
-source("scripts/census2_treat_data.R") # tidy agriculture census data
+source("scripts/census2_recode.R")     # recode variables
+source("scripts/census3_mun_data.R")   # tidy municipality-level agriculture census data
+source("scripts/census4_state_data.R") # tidy state-level agriculture census data
 # saves outputs
 readr::write_csv(df_census_mun,   "data_outputs/3_census_data/df_census_mun.csv")
 readr::write_csv(df_census_state, "data_outputs/3_census_data/df_census_state.csv")
@@ -105,7 +107,10 @@ readr::write_csv(df_yearly_prices, "data_outputs/4_yearly_data/df_prices.csv")
 # (5) report results ------------------------------------------------------
 # define which states will be included in the report
 # "SP" and "MG" also have significant Cerrado area but were not included
-report_states <- c("GO", "MT", "MS", "MA", "TO", "PI", "BA", "DF")
+#
+# if the grid was created by subsetting states, use set_subset_area as the vector of included states;
+# otherwise, specify which states should be included in the report
+report_states <- if (exists("set_subset_area")) set_subset_area else c("GO", "MT", "MS", "MA", "TO", "PI", "BA", "DF")
 
 # render report
 rmarkdown::render("report1.Rmd", output_file = "report1.html")
