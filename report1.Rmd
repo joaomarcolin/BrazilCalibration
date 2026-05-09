@@ -319,6 +319,22 @@ mun_2017_yield <- summarise_mun_yield_f("2017") %>% rename(group = group_2017)
 mun_yields_years <- rbind(mun_1985_yield, mun_1995_yield,
                           mun_2006_yield, mun_2017_yield)
 
+## histogram
+#mun_yields_years %>%
+#  dplyr::filter(year==1985)
+#  ggplot(aes(x = yield_S)) +
+#  geom_histogram(bins=50) +
+#  # scale_x_log10() + # log scale to make it visible
+#  theme_minimal()
+#
+## density plot
+#mun_yields_years %>%
+#  dplyr::filter(year==1985)
+#  ggplot(aes(x = yield_S)) +
+#  # scale_x_log10() + # log scale to make it visible
+#  geom_density() +
+#  theme_minimal()
+
 # plot dispersion of yield_S (from IBGE's PAM)
 plot_box_S_years <- mun_yields_years %>%
   dplyr::filter(area_S > 0) %>%
@@ -480,6 +496,23 @@ rm(plot_yield_S_1985, plot_yield_S_1995,
 ## Distribution of municipality-level cattle yield
 
 ```{r mun_yield_C_distrib, echo=FALSE}
+
+## histogram
+#mun_yields_years %>%
+#  dplyr::filter(year==1985)
+#  ggplot(aes(x = yield_C)) +
+#  geom_histogram(bins=50) +
+#  # scale_x_log10() + # log scale to make it visible
+#  theme_minimal()
+#
+## density plot
+#mun_yields_years %>%
+#  dplyr::filter(year==1985)
+#  ggplot(aes(x = yield_C)) +
+#  geom_density() +
+#  # scale_x_log10() + # log scale to make it visible
+#  theme_minimal()
+
 # plot dispersion of yield_C (head of cattle per hectare)
 plot_box_C_years <- mun_yields_years %>%
   dplyr::filter(area_C > 0) %>%

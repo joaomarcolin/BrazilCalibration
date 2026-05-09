@@ -100,7 +100,6 @@ readr::write_csv(df_census_state, "data_outputs/3_census_data/df_census_state.cs
 source("scripts/yearly1_load_mapbiomas.R") # load Mapbiomas data
 source("scripts/yearly2_load_PAM_PPM.R")   # load PAM and PPM data and create 'df_yearly_mun' table with yearly municipality-level data
 source("scripts/yearly3_price_data.R")     # get yearly country-level variables
-#source("scripts/yearly4_fix_yield.R")      # fixes yield (cattle per hectare)
 # saves outputs
 readr::write_csv(df_yearly_mun,    "data_outputs/4_yearly_data/df_yearly_mun.csv")
 readr::write_csv(df_yearly_prices, "data_outputs/4_yearly_data/df_prices.csv")
@@ -121,6 +120,7 @@ included_states <- if (exists("set_subset_area")) set_subset_area else c("GO", "
                                                                          "AC", "AP", "AM", "PA", "RO", "RR", "TO")
 # manipulate data to prepare model initializetion
 source("scripts/final_output.R")
+
 # report results
 rmarkdown::render("report2.Rmd", output_file = "report2.html")
 # saves results
