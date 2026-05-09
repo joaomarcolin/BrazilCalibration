@@ -12,9 +12,9 @@
 
 # (1) load grid and set output path ---------------------------------------
 terraOptions(progress = 1) # shows progress bar
-path_input_shp <- paste0("data_outputs/3_cell_grid/4_treat_grid/",set_name,"_grid_tenure_",param_plot_km,"km.shp")
+path_input_shp <- paste0("data_outputs/1_cell_grid/4_treat_grid/brazil_grid_tenure_",param_plot_km,"km.shp")
 grid_sf        <- sf::st_read(path_input_shp)
-path_out_shp   <- paste0("data_outputs/3_cell_grid/5_grid_lulc/",set_name,"_grid_lulc_",param_plot_km,"km.shp")
+path_out_shp   <- paste0("data_outputs/1_cell_grid/5_grid_lulc/brazil_grid_lulc_",param_plot_km,"km.shp")
 
 # (2) define function to extract LULC statistics --------------------------
 # the main function must take "grid_sf" and a LUC raster for a given year and calculate
@@ -25,7 +25,7 @@ get_lulc_vars <- function(my_grid, year) {
   start_time <- Sys.time()
   
   # load LULC raster for specified year
-  lulc_path <- paste0("data_outputs/3_cell_grid/2_recode_lulc/lulc_",year,".tif")
+  lulc_path <- paste0("data_outputs/1_cell_grid/2_recode_lulc/lulc_",year,".tif")
   message("Processing: ", basename(lulc_path))
   lulc_rast <- terra::rast(lulc_path)
   

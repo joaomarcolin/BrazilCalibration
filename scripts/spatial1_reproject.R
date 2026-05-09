@@ -105,10 +105,10 @@ brazil_sf <- biomes_sf %>%
   sf::st_as_sf()
 
 # (1.6) save reprojected shapefile and clean up
-sf::st_write(cities_sf, "data_outputs/3_cell_grid/1_reproject/cities_EPSG5880.shp", delete_layer=TRUE)
-sf::st_write(states_sf, "data_outputs/3_cell_grid/1_reproject/states_EPSG5880.shp", delete_layer=TRUE)
-sf::st_write(brazil_sf, "data_outputs/3_cell_grid/1_reproject/brazil_EPSG5880.shp", delete_layer=TRUE)
-sf::st_write(biomes_sf, "data_outputs/3_cell_grid/1_reproject/biomes_EPSG5880.shp", delete_layer=TRUE)
+sf::st_write(cities_sf, "data_outputs/1_cell_grid/1_reproject/cities_EPSG5880.shp", delete_layer=TRUE)
+sf::st_write(states_sf, "data_outputs/1_cell_grid/1_reproject/states_EPSG5880.shp", delete_layer=TRUE)
+sf::st_write(brazil_sf, "data_outputs/1_cell_grid/1_reproject/brazil_EPSG5880.shp", delete_layer=TRUE)
+sf::st_write(biomes_sf, "data_outputs/1_cell_grid/1_reproject/biomes_EPSG5880.shp", delete_layer=TRUE)
 rm(cities_sf, states_sf, brazil_sf, biomes_sf)
 
 # (2) Conservation Units and Indigenous Territories -----------------------
@@ -133,7 +133,7 @@ protected_areas_sf <- rbind(cnuc_sf, funai_sf) %>%
   dplyr::select(polygon = x) # only keep the polygons
 
 # save output and clean up
-sf::st_write(protected_areas_sf, "data_outputs/3_cell_grid/1_reproject/protected_areas_EPSG5880.shp", delete_layer=TRUE)
+sf::st_write(protected_areas_sf, "data_outputs/1_cell_grid/1_reproject/protected_areas_EPSG5880.shp", delete_layer=TRUE)
 rm(cnuc_sf, funai_sf, protected_areas_sf)
 
 # (3) FAO GAEZ attainable yield -------------------------------------------
@@ -141,7 +141,7 @@ rm(cnuc_sf, funai_sf, protected_areas_sf)
 fao_rast <- terra::rast("data_inputs/FAO/ylHr_soy.tif")
 
 # get Brazil's polygon to crop FAO's raster
-brazil_sf <- sf::st_read("data_outputs/3_cell_grid/1_reproject/brazil_EPSG5880.shp") %>%
+brazil_sf <- sf::st_read("data_outputs/1_cell_grid/1_reproject/brazil_EPSG5880.shp") %>%
   # reproject to match FAO's projection
   sf::st_transform(crs=sf::st_crs(fao_rast))
 
@@ -152,7 +152,7 @@ fao_brazil_rast <- terra::mask(fao_brazil_rast, brazil_sf)
 # reproject FAO's raster to EPSG:5880
 fao_brazil_rast <- terra::project(fao_brazil_rast, y = "epsg:5880", method = "bilinear")
 # save output
-terra::writeRaster(fao_brazil_rast, "data_outputs/3_cell_grid/1_reproject/fao_brazil_soy_yield.tif", overwrite=TRUE)
+terra::writeRaster(fao_brazil_rast, "data_outputs/1_cell_grid/1_reproject/fao_brazil_soy_yield.tif", overwrite=TRUE)
 # clean up
 rm(fao_rast, brazil_sf, fao_brazil_rast)
 
@@ -167,7 +167,7 @@ rm(fao_rast, brazil_sf, fao_brazil_rast)
 reproject_mb_f <- function(year) {
   # set input and output paths
   input_path  <- paste0("data_inputs/Mapbiomas/brazil_coverage_",year,".tif")
-  output_path <- paste0("data_outputs/3_cell_grid/1_reproject/mapbiomas",year,"_EPSG5880.tif")
+  output_path <- paste0("data_outputs/1_cell_grid/1_reproject/mapbiomas",year,"_EPSG5880.tif")
   # load raster
   terra::rast(input_path) %>%
     # reproject raster

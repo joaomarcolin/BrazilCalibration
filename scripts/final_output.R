@@ -6,64 +6,11 @@
 # we want to consider municipalities that were created after 1985 so the data
 # is comparable throughout the period
 
-# delete afterwards -------------------------------------------------------
-
-rm(list=ls())
-
-library(tidyverse)
-library(terra)
-library(sf)
-library(exactextractr)
-library(readxl)
-library(tictoc)
-
-param_plot_km <- 5        # must be a positive integer
-set_subset    <- FALSE    # if TRUE, the cell grid is constructed only for the set of states or the biome specified below
-set_name      <- "brazil" # name the area of interest, used to save the final cell grid
-
-if (set_subset) {
-  # how to divide the country?
-  set_subset_by   <- "state" # must be "state", "biome" or "both"
-  # what is the relevant area?
-  #   if subsetting by state, pick a vector of state acronyms - e.g., c("GO","MG","BA");
-  #   if subsetting by biome, pick "cerrado" or "amazon"
-  #   if subsetting by both,  pick a vector where the first element is a biome and the following elements are state acronyms
-  set_subset_area <- c("GO", "MT", "MS", "MA", "TO", "PI", "BA", "DF")
-}
-
-#included_states <- if (exists("set_subset_area")) set_subset_area else c("GO", "MT", "MS", "MA", "TO", "PI", "BA", "DF",
-#                                                                         "AC", "AP", "AM", "PA", "RO", "RR", "TO")
-
-included_states <- c("RO", "AC", "AM", "RR", "PA", "AP", "TO", "MA", "PI",
-                     "CE", "RN", "PB", "PE", "AL", "SE", "BA", "MG", "ES", 
-                     "RJ", "SP", "PR", "SC", "RS", "MS", "MT", "GO", "DF")
-
-# (0) load inputs ---------------------------------------------------------
+# (1) load inputs ---------------------------------------------------------
 df_brazil_mun <- readr::read_csv(
                    "data_outputs/2_brazil_mun/df_brazil_mun.csv",
                    col_types = cols(.default = col_character())
-                   ) %>%
-                 dplyr::filter(
-                   state %in% included_states
-                   ) %>%
-                 dplyr::select(
-                   code_mun:name_biome
                    )
-
-#df_census_state <- readr::read_csv(
-#                     "data_outputs/3_census_data/df_census_state.csv",
-#                     col_types = cols(
-#                       .default      = col_character(),
-#                       year          = col_number(),
-#                       farm_area_ha  = col_number(),
-#                       n_farms       = col_number(),
-#                       activity_area = col_number(),
-#                       workers       = col_number()
-#                       )
-#                     ) %>%
-#                   dplyr::filter(
-#                     state %in% included_states
-#                     )
 
 df_census_mun <- readr::read_csv(
                    "data_outputs/3_census_data/df_census_mun.csv",
@@ -76,9 +23,6 @@ df_census_mun <- readr::read_csv(
                      activity_area = col_number(),
                      workers       = col_number()
                      )
-                   ) %>%
-                 dplyr::filter(
-                   state %in% included_states
                    )
 
 df_yearly_mun <- readr::read_csv(
@@ -99,9 +43,6 @@ df_yearly_mun <- readr::read_csv(
                      mb_forestry_ha = col_number(),
                      mb_pcrop_ha    = col_number()
                      )
-                   ) %>%
-                 dplyr::filter(
-                   state %in% included_states
                    )
 
 df_yearly_prices <- readr::read_csv(
@@ -112,31 +53,18 @@ df_yearly_prices <- readr::read_csv(
                       )
 
 df_grid <- readr::read_csv(
-             paste0("data_outputs/1_cell_grid/6_complete_grid/df_",set_name,"_grid_",param_plot_km,"km.csv"),
+             paste0("data_outputs/1_cell_grid/6_complete_grid/df_brazil_grid_",param_plot_km,"km.csv"),
              col_types = cols(
                .default   = col_number(),
                cell_id    = col_character(),
                code_mun   = col_character(),
                code_biome = col_character()
                )
-             ) %>%
-           dplyr::filter(
-             code_mun %in% df_brazil_mun$code_mun
              )
 
 sf_grid <- sf::st_read(
-             paste0("data_outputs/1_cell_grid/6_complete_grid/sf_",set_name,"_grid_",param_plot_km,"km.shp")
-             ) %>%
-           dplyr::filter(
-             cell_id %in% df_grid$cell_id
+             paste0("data_outputs/1_cell_grid/6_complete_grid/sf_brazil_grid_",param_plot_km,"km.shp")
              )
-
-# (1) exclude municipalities not present in the cell grid -----------------
-# this only makes a difference if the cell grid was created as the overlap of a set of states and a biome
-df_grid <- df_grid %>% dplyr::filter(cell_id %in% sf_grid$cell_id)
-df_brazil_mun <- df_brazil_mun %>% dplyr::filter(code_mun %in% df_grid$code_mun)
-df_census_mun <- df_census_mun %>% dplyr::filter(code_mun %in% df_grid$code_mun)
-df_yearly_mun <- df_yearly_mun %>% dplyr::filter(code_mun %in% df_grid$code_mun)
 
 # (2) calculate cv_I and theta_S (tons of soybean / plot) -----------------
 # I use FAO GAEZ's soy yield (tons/hectare) and substitute zeroes with the lowest available positive yield
@@ -165,7 +93,6 @@ summarise_mun_yield_f <- function(yr) {
   # summarise df_yearly_mun
   df_year <- df_yearly_mun %>%
     dplyr::filter(
-      state %in% included_states,
       year == yr) %>%
     dplyr::select(
       state,
@@ -189,6 +116,8 @@ summarise_mun_yield_f <- function(yr) {
   df_year$yield_C <- ifelse(df_year$area_C > 0,
                             df_year$herd_C / df_year$area_C,
                             0)
+  # identify outliers
+  df_year$outlier <- df_year$yield_C > 2
   # return summarised data.frame
   return(df_year)
 } # close summarise_mun_yield_f(yr)
@@ -199,15 +128,19 @@ mun_1995_yield <- summarise_mun_yield_f("1995") # Brazil: 4469 municipalities, 3
 mun_2006_yield <- summarise_mun_yield_f("2006") # Brazil: 5547 municipalities, 450 have >2 cattle per ha
 mun_2017_yield <- summarise_mun_yield_f("2017") # Brazil: 5547 municipalities, 558 have >2 cattle per ha
 rm(summarise_mun_yield_f)
+# identify outliers and save their id codes
+outlier_1985 <- mun_1985_yield %>% dplyr::filter(outlier) %>% dplyr::select(group_1985)
+outlier_1995 <- mun_1995_yield %>% dplyr::filter(outlier) %>% dplyr::select(group_1995)
+outlier_2006 <- mun_2006_yield %>% dplyr::filter(outlier) %>% dplyr::select(group_2006)
+outlier_2017 <- mun_2017_yield %>% dplyr::filter(outlier) %>% dplyr::select(group_2017)
 
-# (3.2) fix outliers
+# (3.3) fix outliers
 # assume that all municipalities with >2 cattle per hectares are outliers,
 # identify all outliers and attribute to them the average yield of all non-outlier municipalities in the same state
 #
 # auxiliary function to correct outliers
 fix_outliers_f <- function(df) {
   # add columns to identify outliers and regular municipalities
-  df$outlier <- df$yield_C > 2
   df$regular <- !df$outlier
   # summarise herd and pasture area at state-level (only regular municipalities)
   df_state <- df %>%
@@ -240,13 +173,17 @@ fix_outliers_f <- function(df) {
   # return final data.frame
   return(df)
 }
-
 # substitute yield_C for all municipalities with >2 head of cattle per hectare
 mun_1985_yield <- fix_outliers_f(mun_1985_yield) %>% dplyr::rename(`1985` = yield_C)
 mun_1995_yield <- fix_outliers_f(mun_1995_yield) %>% dplyr::rename(`1995` = yield_C)
 mun_2006_yield <- fix_outliers_f(mun_2006_yield) %>% dplyr::rename(`2006` = yield_C)
 mun_2017_yield <- fix_outliers_f(mun_2017_yield) %>% dplyr::rename(`2017` = yield_C)
 rm(fix_outliers_f)
+# save outliers' new yield_C values
+outlier_1985 <- outlier_1985 %>% left_join(mun_1985_yield, by="group_1985")
+outlier_1995 <- outlier_1995 %>% left_join(mun_1995_yield, by="group_1995")
+outlier_2006 <- outlier_2006 %>% left_join(mun_2006_yield, by="group_2006")
+outlier_2017 <- outlier_2017 %>% left_join(mun_2017_yield, by="group_2017")
 
 ## histogram
 #mun_1985_yield %>%
@@ -320,6 +257,69 @@ df_grid <- df_grid %>%
 rm(mun_1985_yield, mun_1995_yield,
    mun_2006_yield, mun_2017_yield,
    df_yield_C)
+rm(outlier_1985, outlier_1995,
+   outlier_2006, outlier_2017)
+# (4) fix outliers in df_yearly_mun ---------------------------------------
+## auxiliary function to summarise table by group/period and calculate yield
+#summarise_yearly_f <- function(yr, period) {
+#  # define grouping column
+#  group_col <- paste0("group_",yr)
+#  # summarise df_yearly_mun
+#  df_period <- df_yearly_mun %>%
+#    dplyr::select(
+#      code_mun, all_of(group_col), year,
+#      soy_area = pam_area_ha,
+#      soy_tons = pam_output_ton,
+#      tot_herd = ppm_herd,
+#      cat_area = mb_pasture_ha
+#      ) %>%
+#    dplyr::filter(
+#      year %in% period
+#      ) %>%
+#    dplyr::group_by(
+#      code_mun, across(all_of(group_col)), year
+#      ) %>%
+#    dplyr::summarise(
+#      soy_area = sum(soy_area, na.rm=TRUE),
+#      soy_tons = sum(soy_tons, na.rm=TRUE),
+#      tot_herd = sum(tot_herd, na.rm=TRUE),
+#      cat_area = sum(cat_area, na.rm=TRUE),
+#      .groups  = "drop"
+#      )
+#  # calculate yields
+#  df_period$yield_S <- ifelse(
+#                         df_period$soy_area > 0,
+#                         df_period$soy_tons / df_period$soy_area,
+#                         0
+#                         )
+#  df_period$yield_C <- ifelse(
+#                         df_period$cat_area > 0,
+#                         df_period$tot_herd / df_period$cat_area,
+#                         0
+#                         )
+#  # return data.frame
+#  return(df_period)
+#}
+#
+#yield_1985 <- summarise_yearly_f(yr="1985", period=1985:1994)
+#yield_1995 <- summarise_yearly_f(yr="1995", period=1995:2005)
+#yield_2006 <- summarise_yearly_f(yr="2006", period=2006:2016)
+#yield_2017 <- summarise_yearly_f(yr="2017", period=2017:2024)
+#
+#
+## histogram
+#yield_1985 %>%
+#  ggplot(aes(x = yield_C)) +
+#  geom_histogram(bins=50) +
+#  theme_minimal()
+#
+## density plot
+#yield_1985 %>%
+#  ggplot(aes(x = yield_C)) +
+#  geom_density() +
+#  theme_minimal()
+
+
 
 
 

@@ -7,7 +7,7 @@
 ## 0  3  4  5  6  9 11 12 13 15 20 21 23 24 25 29 30 31 32 33 35 39 40 41 46 47 48 49 50 62 75
 ## to get a raster's unique values, uncomment and run the code bellow (this example uses the 1985 data):
 #
-#MB_1985 <- terra::rast("data_outputs/3_cell_grid/1_reproject/mapbiomas1985_EPSG5880.tif")
+#MB_1985 <- terra::rast("data_outputs/1_cell_grid/1_reproject/mapbiomas1985_EPSG5880.tif")
 #print(MB_1985) ; terra::res(MB_1985) ; terra::ext(MB_1985) ; terra::crs(MB_1985) # summarize raster
 #datatype(MB_1985)                                                                # check class (mapbiomas' rasters are "numeric")
 #class_counts <- freq(MB_1985)                                                    # count number of pixels in each class (takes about 10min)
@@ -32,8 +32,8 @@ reclass_matrix <- base::rbind(
 # auxiliary function to load, recode and save rasters
 recode_mb_f <- function(year) {
   # set input and output path
-  input_path  <- paste0("data_outputs/3_cell_grid/1_reproject/mapbiomas",year,"_EPSG5880.tif")
-  output_path <- paste0("data_outputs/3_cell_grid/2_recode_lulc/lulc_",year,".tif")
+  input_path  <- paste0("data_outputs/1_cell_grid/1_reproject/mapbiomas",year,"_EPSG5880.tif")
+  output_path <- paste0("data_outputs/1_cell_grid/2_recode_lulc/lulc_",year,".tif")
   # load raster
   terra::rast(input_path) %>%
     # reclass

@@ -5,8 +5,8 @@
 ## This information is saved in a new shapefile.
 
 # (0) loads cell grid -----------------------------------------------------
-grid_vec  <- terra::vect(paste0("data_outputs/1_cell_grid/3_create_grid/",set_name,"_grid_",param_plot_km,"km.shp"))
-grid_rast <- terra::rast(paste0("data_outputs/1_cell_grid/3_create_grid/",set_name,"_grid_",param_plot_km,"km.tif"))
+grid_vec  <- terra::vect(paste0("data_outputs/1_cell_grid/3_create_grid/brazil_grid_",param_plot_km,"km.shp"))
+grid_rast <- terra::rast(paste0("data_outputs/1_cell_grid/3_create_grid/brazil_grid_",param_plot_km,"km.tif"))
 grid_sf   <- sf::st_as_sf(grid_vec) 
 
 # (1) assign municipality codes -------------------------------------------
@@ -154,7 +154,7 @@ if (length(na_cells) > 0) {
 rm(biomes_sf, na_centroids, nearest, na_cells)
 
 # (6) save outputs --------------------------------------------------------
-path_out_shp    <- paste0("data_outputs/1_cell_grid/4_treat_grid/",set_name,"_grid_tenure_",param_plot_km,"km.shp")
+path_out_shp    <- paste0("data_outputs/1_cell_grid/4_treat_grid/brazil_grid_tenure_",param_plot_km,"km.shp")
 sf::st_write(grid_sf, path_out_shp, delete_layer=TRUE)
 rm(grid_rast, grid_vec, path_out_shp)
 
