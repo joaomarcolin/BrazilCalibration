@@ -18,13 +18,6 @@
 # worker2_2006       #     0 NA values
 # worker_2017        # 35590 NA values
 
-# load df_mun
-df_mun <- readr::read_csv(
-  "data_outputs/2_brazil_mun/df_brazil_mun.csv",
-  col_types = cols(.default = col_character())
-) %>%
-  dplyr::select(code_mun:legal_amazon)
-
 # (1) recode state names --------------------------------------------------
 dict_state <- c("Acre"              ="AC", "Alagoas"             ="AL",
                 "Amapá"             ="AP", "Amazonas"            ="AM",

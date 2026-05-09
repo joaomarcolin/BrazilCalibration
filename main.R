@@ -20,7 +20,6 @@ if (!dir.exists("data_outputs/1_cell_grid"))    dir.create("data_outputs/1_cell_
 if (!dir.exists("data_outputs/2_brazil_mun"))   dir.create("data_outputs/2_brazil_mun")
 if (!dir.exists("data_outputs/3_census_data"))  dir.create("data_outputs/3_census_data")
 if (!dir.exists("data_outputs/4_yearly_data"))  dir.create("data_outputs/4_yearly_data")
-if (!dir.exists("data_outputs/5_final"))        dir.create("data_outputs/5_final")
 if (!dir.exists("results"))                     dir.create("results")
 
 # report data sources
@@ -79,6 +78,7 @@ sf::st_write(sf_grid,     paste0("data_outputs/1_cell_grid/6_complete_grid/sf_",
 # created after 1985, so there are many NAs. I group municipalities into a few groups
 # so data can be aggregated at the municipality-group-level consistently through 1985-2024
 source("scripts/group_municipalities.R") # takes about 5 min to run
+
 readr::write_csv(df_brazil_mun, "data_outputs/2_brazil_mun/df_brazil_mun.csv")
 
 # (3) agriculture census data ---------------------------------------------
@@ -100,23 +100,38 @@ readr::write_csv(df_census_state, "data_outputs/3_census_data/df_census_state.cs
 source("scripts/yearly1_load_mapbiomas.R") # load Mapbiomas data
 source("scripts/yearly2_load_PAM_PPM.R")   # load PAM and PPM data and create 'df_yearly_mun' table with yearly municipality-level data
 source("scripts/yearly3_price_data.R")     # get yearly country-level variables
+#source("scripts/yearly4_fix_yield.R")      # fixes yield (cattle per hectare)
 # saves outputs
 readr::write_csv(df_yearly_mun,    "data_outputs/4_yearly_data/df_yearly_mun.csv")
 readr::write_csv(df_yearly_prices, "data_outputs/4_yearly_data/df_prices.csv")
 
-# (5) report results ------------------------------------------------------
+# (5) report preliminary results ------------------------------------------
 # define which states will be included in the report
 # "SP" and "MG" also have significant Cerrado area but were not included
 #
 # if the grid was created by subsetting states, use set_subset_area as the vector of included states;
 # otherwise, specify which states should be included in the report
-report_states <- if (exists("set_subset_area")) set_subset_area else c("GO", "MT", "MS", "MA", "TO", "PI", "BA", "DF")
-
+report_states <- if (exists("set_subset_area")) set_subset_area else c("GO", "MT", "MS", "MA", "TO", "PI", "BA", "DF",
+                                                                       "AC", "AP", "AM", "PA", "RO", "RR", "TO")
 # render report
 rmarkdown::render("report1.Rmd", output_file = "report1.html")
-#rmarkdown::render("report2.Rmd", output_file = "report2.html")
 
 # (6) final results -------------------------------------------------------
+included_states <- if (exists("set_subset_area")) set_subset_area else c("GO", "MT", "MS", "MA", "TO", "PI", "BA", "DF",
+                                                                         "AC", "AP", "AM", "PA", "RO", "RR", "TO")
+# manipulate data to prepare model initializetion
+source("scripts/final_output.R")
+# report results
+rmarkdown::render("report2.Rmd", output_file = "report2.html")
+# saves results
+readr::write_csv(df_census_state,   "results/df_census_state.csv")
+readr::write_csv(df_census_mun,     "results/df_census_mun.csv")
+readr::write_csv(df_yearly_prices,  "results/df_yearly_prices.csv")
+readr::write_csv(df_municipalities, "results/df_municipalities.csv")
+readr::write_csv(df_grid,    paste0("results/grid_df_",set_name,"_",param_plot_km,"km.csv"))
+
+
+
 
 # PREVIOUS (OUTDATED) SCRIPTS
 #source("scripts/census3_get_parameters.R") # calculate model parameters
@@ -124,14 +139,6 @@ rmarkdown::render("report1.Rmd", output_file = "report1.html")
 #source("scripts/yearly4_calculate_yield.R")   # calculate yield
 #source("scripts/yearly5_price_series.R")      # get yearly country-level variables
 
-source("scripts/final1_data.R")           # group municipality-level data
-source("scripts/final2_initialization.R") # generate final grid_df
-
-# saves outputs
-readr::write_csv(df_census_state,   "results/df_census_state.csv")
-readr::write_csv(df_census_mun,     "results/df_census_mun.csv")
-readr::write_csv(df_yearly_prices,  "results/df_yearly_prices.csv")
-readr::write_csv(df_municipalities, "results/df_municipalities.csv")
-readr::write_csv(df_grid,    paste0("results/grid_df_",set_name,"_",param_plot_km,"km.csv"))
 #sf::st_write(sf_grid,        paste0("results/grid_sf_",set_name,"_",param_plot_km,"km.shp"), delete_layer=TRUE)
+
 

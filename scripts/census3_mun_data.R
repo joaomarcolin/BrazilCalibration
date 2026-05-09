@@ -1,6 +1,15 @@
 # This script treats municipality-level data from IBGE's Census of Agriculture
 # for 1995, 2006 and 2017
 
+# (0) load df_mun ---------------------------------------------------------
+df_mun <- readr::read_csv(
+            "data_outputs/2_brazil_mun/df_brazil_mun.csv",
+            col_types = cols(.default = col_character())
+            ) %>%
+          dplyr::select(
+            code_mun:name_biome
+            )
+
 # (1) recover the individual tables ---------------------------------------
 list2env(census2, envir=.GlobalEnv) # worker_1995  area_2017    farm_2017   area_activity_1995/2006/2017
 list2env(census3, envir=.GlobalEnv) # worker1_2006 worker2_2006 worker_2017

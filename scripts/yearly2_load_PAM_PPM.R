@@ -6,7 +6,7 @@ df_mun <- readr::read_csv(
             "data_outputs/2_brazil_mun/df_brazil_mun.csv",
             col_types = cols(.default = col_character())
             ) %>%
-          dplyr::select(code_mun:legal_amazon)
+          dplyr::select(code_mun:name_biome)
 
 # (1) load data -----------------------------------------------------------
 # auxiliary function to load yearly data

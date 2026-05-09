@@ -13,7 +13,9 @@ brazil_mun_df <- read_csv("data_inputs/BdD/brasil_mun.csv", col_types = cols(.de
     name_rgi   = nome_regiao_imediata,      code_meso    = id_mesorregiao,
     name_meso  = nome_mesorregiao,          code_rgint   = id_regiao_intermediaria,
     name_rgint = nome_regiao_intermediaria, legal_amazon = amazonia_legal
-  )
+  ) %>%
+  # remove Fernando de Noronha (PE)
+  dplyr::filter(code_mun != "2605459")
 
 # load table with Áreas Minimamente Comparáveis - keep track of new municipalities
 brazil_amc_df <- read_csv("data_inputs/BdD/brasil_amc.csv", col_types = cols(.default = col_character())) %>%
@@ -22,10 +24,17 @@ brazil_amc_df <- read_csv("data_inputs/BdD/brasil_amc.csv", col_types = cols(.de
   # select and rename columns
   dplyr::select(
     code_mun  = id_municipio,
-    code_amc  = id_amc)
+    code_amc  = id_amc) %>%
+  # remove Fernando de Noronha (PE)
+  dplyr::filter(code_mun != "2605459")
 
 # load municipalities shapefiles from 2024
-cities_sf <- sf::st_read("data_outputs/1_cell_grid/1_reproject/cities_EPSG5880.shp", quiet = TRUE)
+cities_sf <- sf::st_read("data_outputs/1_cell_grid/1_reproject/cities_EPSG5880.shp", quiet = TRUE) %>%
+  # remove Fernando de Noronha (PE)
+  dplyr::filter(code_mun != "2605459") %>%
+  # add area column
+  dplyr::mutate(mun_area_km2 = as.numeric(sf::st_area(geometry))/1e6)
+  
 # load biomes shapefiles
 biomes_sf <- sf::st_read("data_outputs/1_cell_grid/1_reproject/biomes_EPSG5880.shp", quiet = TRUE)
 # load protected area shapefiles
@@ -33,40 +42,24 @@ protected_sf <- sf::st_read("data_outputs/1_cell_grid/1_reproject/protected_area
 # load FAO GAEZ's raster for attainable soybean yield
 fao_rast <- terra::rast("data_outputs/1_cell_grid/1_reproject/fao_brazil_soy_yield.tif")
 
-# (2) calculate biome area per municipality -------------------------------
-tic("Calculate biome area per municipality")
-# intersect municipalities' and biomes' polygons
-mun_biome_sf <- sf::st_intersection(cities_sf, biomes_sf)
-
-# compute the area (km2) of each intersection
-mun_biome_df <- mun_biome_sf %>%
-  dplyr::mutate(area_km2 = as.numeric(sf::st_area(geometry))/1e6) %>%
-  sf::st_drop_geometry()
-
-# pivot to wide format: one row per municipality
-mun_biome_df <- mun_biome_df %>%
-  dplyr::select(code_mun, name_biome, area_km2) %>%
-  tidyr::pivot_wider(
-    names_from  = name_biome,
-    names_glue  = "{name_biome}_{.value}",
-    names_sort  = TRUE,
-    values_from = area_km2,
-    values_fill = 0
-  ) %>%
-  # calculate municipality total area
-  dplyr::mutate(
-    mun_area_km2 = amazon_area_km2 + atlantic_area_km2 + caatinga_area_km2 + 
-      cerrado_area_km2 + islands_area_km2 + pampa_area_km2 + pantanal_area_km2
-  )
-
-# clean up polygon data
-rm(biomes_sf, mun_biome_sf)
+# (2) find predominant biome per municipality -----------------------------
+tic("Find predominant biome per municipality")
+mun_biome_df <- cities_sf %>%
+  sf::st_intersection(biomes_sf) %>%
+  dplyr::mutate(intersect_area = st_area(geometry)) %>%
+  sf::st_drop_geometry() %>%
+  dplyr::group_by(code_mun) %>%
+  dplyr::slice_max(intersect_area) %>%
+  dplyr::ungroup() %>%
+  dplyr::select(code_mun, name_biome)
+rm(biomes_sf)
 toc()
 
 # (3) calculate municipality protected area -------------------------------
-# check if protected areas overlap
+## check if protected areas overlap
 #overlaps <- sf::st_overlaps(protected_sf)
 #any(lengths(overlaps)>0)
+
 tic("Calculate protected area per municipality")
 # intersect municipalities' and protected areas' polygons
 mun_protected_sf <- sf::st_intersection(cities_sf, protected_sf)
@@ -78,7 +71,6 @@ mun_protected_df <- mun_protected_sf %>%
   sf::st_drop_geometry() %>%
   dplyr::group_by(code_mun) %>%
   dplyr::summarise(mun_protected_area_km2 = sum(protected_area_km2))
-
 # clean up polygon data
 rm(protected_sf, mun_protected_sf)
 toc()
@@ -96,17 +88,25 @@ mun_soy_yield_df$FAO_soy_yield <- mun_soy_yield_df$FAO_soy_yield/1000
 # replace NAs with 0s
 mun_soy_yield_df$FAO_soy_yield[is.na(mun_soy_yield_df$FAO_soy_yield)] <- 0
 # clean up
-rm(cities_sf, fao_rast)
+rm(fao_rast)
 toc()
 
 # (5) join everything in a single table -----------------------------------
+cities_df <- cities_sf %>%
+  sf::st_drop_geometry() %>%
+  dplyr::select(code_mun, mun_area_km2)
+
 df_brazil_mun <- brazil_amc_df %>%
   dplyr::full_join(
     brazil_mun_df,
     by = "code_mun"
   ) %>%
   dplyr::full_join(
-    mun_biome_df, 
+    mun_biome_df,
+    by = "code_mun"
+  ) %>%
+  dplyr::full_join(
+    cities_df, 
     by = "code_mun"
   ) %>%
   dplyr::full_join(
@@ -122,9 +122,12 @@ df_brazil_mun <- brazil_amc_df %>%
 df_brazil_mun$legal_amazon <- as.logical(as.integer(df_brazil_mun$legal_amazon))
 # fix column 'mun_protected_area_km2': should be 0 for municipalities without protected area, is NA
 df_brazil_mun$mun_protected_area_km2[is.na(df_brazil_mun$mun_protected_area_km2)] <- 0
-
+# fix column 'mun_protected_area_km2': should never be higher than 
+mun_fix <- df_brazil_mun$mun_protected_area_km2 > df_brazil_mun$mun_area_km2
+df_brazil_mun$mun_protected_area_km2[mun_fix] <- df_brazil_mun$mun_area_km2[mun_fix]
 # clean up
-rm(brazil_amc_df, brazil_mun_df, mun_biome_df, mun_protected_df, mun_soy_yield_df)
+rm(brazil_amc_df, brazil_mun_df, mun_biome_df, mun_protected_df, mun_soy_yield_df,
+   cities_sf, cities_df, mun_fix)
 
 # (5) deal with missing code_amc values -----------------------------------
 
@@ -153,12 +156,6 @@ df_brazil_mun$code_amc[df_brazil_mun$code_mun=="5006275"] <- "1073"
 ## that is because Ataléia (MG), code_mun="3104700", was mistakenly included in an AMC in ES;
 ## since this municipality existed in 1980, I give it an exclusive code_amc value
 df_brazil_mun$code_amc[df_brazil_mun$code_mun=="3104700"] <- as.character(max(as.numeric(df_brazil_mun$code_amc))+1)
-
-# Municipalities with island area:
-#code_mun  name_mun             state
-#2605459   Fernando de Noronha  PE
-#2906907   Caravelas            BA
-#3205309   Vitória              ES
 
 # (6) group municipalities ------------------------------------------------
 # does any AMC get redundant when the model is initialized at 1995, 2006 or 2017?

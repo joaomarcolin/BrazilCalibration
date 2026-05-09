@@ -1,7 +1,7 @@
 ---
 title: "AgriCerrado Calibration Report"
 author: "João Marcolin"
-date: "28/04/2026"
+date: "08/05/2026"
 output: html_document
 ---
 
@@ -29,20 +29,13 @@ save_fig <- function(plot, name, width = 8, height = 6, dpi = 500) {
 
 ```
 
-```{r load}
+```{r load, include=FALSE}
 # load inputs
-df_brazil_mun    <- readr::read_csv(
+df_brazil_mun  <- readr::read_csv(
   "data_outputs/2_brazil_mun/df_brazil_mun.csv",
   col_types = cols(
     .default               = col_character(),
     legal_amazon           = col_logical(),
-    amazon_area_km2        = col_number(),
-    atlantic_area_km2      = col_number(),
-    caatinga_area_km2      = col_number(),
-    cerrado_area_km2       = col_number(),
-    islands_area_km2       = col_number(),
-    pampa_area_km2         = col_number(),
-    pantanal_area_km2      = col_number(),
     mun_area_km2           = col_number(),
     mun_protected_area_km2 = col_number(),
     FAO_soy_yield          = col_number()
@@ -53,6 +46,19 @@ df_census_state  <- readr::read_csv(
   "data_outputs/3_census_data/df_census_state.csv",
   col_types = cols(
     .default      = col_character(),
+    year          = col_number(),
+    farm_area_ha  = col_number(),
+    n_farms       = col_number(),
+    activity_area = col_number(),
+    workers       = col_number()
+    )
+  )
+
+df_census_mun <- readr::read_csv(
+  "data_outputs/3_census_data/df_census_mun.csv",
+  col_types = cols(
+    .default      = col_character(),
+    legal_amazon  = col_logical(),
     year          = col_number(),
     farm_area_ha  = col_number(),
     n_farms       = col_number(),
@@ -87,6 +93,10 @@ df_yearly_prices <- readr::read_csv(
     .default = col_number()
     )
   )
+
+# load municipalities shapefiles from 2024
+cities_sf <- sf::st_read("data_outputs/1_cell_grid/1_reproject/cities_EPSG5880.shp", quiet = TRUE) %>%
+  dplyr::filter(state %in% report_states)
 
 ```
 
@@ -150,7 +160,7 @@ yearly_state_data <- df_yearly_mun %>%
     across(everything(), ~sum(.x,na.rm=TRUE))
   ) %>%
   dplyr::mutate(
-    yield_C = (ppm_herd*0.1*0.4)/mb_pasture_ha,
+    yield_C = ppm_herd/mb_pasture_ha,
     yield_S = pam_output_ton/pam_area_ha
   )
 
@@ -168,16 +178,16 @@ yearly_brazil_data <- df_yearly_mun %>%
     across(everything(), ~sum(.x,na.rm=TRUE))
   ) %>%
   dplyr::mutate(
-    yield_C = (ppm_herd*0.1*0.4)/mb_pasture_ha,
+    yield_C = ppm_herd/mb_pasture_ha,
     yield_S = pam_output_ton/pam_area_ha
   )
 # fix yield_S_mb: it's way too high in 1985
 yearly_brazil_data$yield_S_mb[1] <- yearly_brazil_data$yield_S_mb[2]
 
 # plot country-level data
-plot_yield_C <- plot_var(yearly_brazil_data, "yield_C", "tons per ha.", "Beef yield (Brazil)") +
+plot_yield_C <- plot_var(yearly_brazil_data, "yield_C", "tons per ha.", "Cattle yield (head/ha., Brazil)") +
   geom_smooth(method = "loess", se=FALSE) # add trend line
-plot_yield_S <- plot_var(yearly_brazil_data, "yield_S", "tons per ha.", "Soybean yield (Brazil)") +
+plot_yield_S <- plot_var(yearly_brazil_data, "yield_S", "tons per ha.", "Soybean yield (tons/ha., Brazil)") +
   geom_smooth(method = "loess", se=FALSE) # add trend line
 
 # plot state-level data
@@ -186,7 +196,7 @@ plot_yield_C_state <- yearly_state_data %>%
   dplyr::filter(state %in% report_states) %>%
   ggplot(aes(x=year, y=yield_C, color=state)) +
   geom_line() +
-  labs(title="Beef yield", x="Year", y="tons/ha", color="State") +
+  labs(title="Cattle yield (head/ha.)", x="Year", y="tons/ha", color="State") +
   theme_minimal()
 
 # plot yield_S
@@ -194,7 +204,7 @@ plot_yield_S_state <- yearly_state_data %>%
   dplyr::filter(state %in% report_states) %>%
   ggplot(aes(x=year, y=yield_S, color=state)) +
   geom_line() +
-  labs(title="Soybean yield", x="Year", y="tons/ha", color="State") +
+  labs(title="Soybean yield (tons/ha.)", x="Year", y="tons/ha", color="State") +
   theme_minimal()
 
 (plot_yield_C | plot_yield_S)
@@ -213,9 +223,9 @@ rm(plot_yield_C, plot_yield_S,
 
 ```
 
-## Distribution of municipality-level yield
+## Distribution of municipality-level soybean yield
 
-```{r mun_yield_distribution_years, echo=FALSE}
+```{r mun_yield_S_distrib, echo=FALSE}
 # auxiliary function to summarise by municipality group
 summarise_mun_yield_f <- function(yr) {
   # define grouping column
@@ -226,13 +236,12 @@ summarise_mun_yield_f <- function(yr) {
       state %in% report_states,
       year == yr) %>%
     dplyr::select(
-      all_of(group_col), state, year,
+      all_of(group_col), year,
       pam_area_ha, pam_output_ton,
       ppm_herd, mb_pasture_ha
       ) %>%
     dplyr::group_by(
       across(all_of(group_col)),
-      state,
       year
       ) %>%
     dplyr::summarise(
@@ -241,26 +250,51 @@ summarise_mun_yield_f <- function(yr) {
       ) %>%
     dplyr::mutate(
       area_C   = mb_pasture_ha,
-      output_C = ppm_herd*0.1*0.4,
+      herd_C   = ppm_herd,
       area_S   = pam_area_ha,
       output_S = pam_output_ton
-    )
+      )
   # calculate yield
   df_year$yield_C <- ifelse(df_year$area_C > 0,
-                            df_year$output_C / df_year$area_C,
+                            df_year$herd_C / df_year$area_C,
                             0)
   df_year$yield_S <- ifelse(df_year$area_S > 0,
                             df_year$output_S/df_year$area_S,
                             0)
+  # summarise df_brazil_mun
+  df_mun <- df_brazil_mun %>%
+    dplyr::filter(
+      state %in% report_states
+      ) %>%
+    dplyr::select(
+      all_of(group_col),
+      state,
+      mun_area_km2,
+      mun_protected_area_km2
+      ) %>%
+    dplyr::group_by(
+      across(all_of(group_col)),
+      state
+      ) %>%
+    dplyr::summarise(
+      mun_area_km2           = sum(mun_area_km2,           na.rm=TRUE),
+      mun_protected_area_km2 = sum(mun_protected_area_km2, na.rm=TRUE)
+      ) %>%
+    dplyr::mutate(
+      mun_protected_area = mun_protected_area_km2 / mun_area_km2
+      )
+  # join df_year and df_mun
+  df_final <- df_mun %>%
+    dplyr::left_join(df_year, by=group_col)
   # return summarised data.frame
-  return(df_year)
+  return(df_final)
 } # close summarise_mun_yield_f(yr)
 
 # summarise by municipality group
-mun_1985_yield <- summarise_mun_yield_f("1985") %>% rename(mun = group_1985)
-mun_1995_yield <- summarise_mun_yield_f("1995") %>% rename(mun = group_1995)
-mun_2006_yield <- summarise_mun_yield_f("2006") %>% rename(mun = group_2006)
-mun_2017_yield <- summarise_mun_yield_f("2017") %>% rename(mun = group_2017)
+mun_1985_yield <- summarise_mun_yield_f("1985") %>% rename(group = group_1985)
+mun_1995_yield <- summarise_mun_yield_f("1995") %>% rename(group = group_1995)
+mun_2006_yield <- summarise_mun_yield_f("2006") %>% rename(group = group_2006)
+mun_2017_yield <- summarise_mun_yield_f("2017") %>% rename(group = group_2017)
 
 ## very few 0 values for cattle, it's probably safe to use the minimum productivity as the lower bound
 #sum(mun_1985_yield$yield_C==0) # 1
@@ -285,22 +319,6 @@ mun_2017_yield <- summarise_mun_yield_f("2017") %>% rename(mun = group_2017)
 mun_yields_years <- rbind(mun_1985_yield, mun_1995_yield,
                           mun_2006_yield, mun_2017_yield)
 
-# plot dispersion of yield_C
-plot_box_C_years <- mun_yields_years %>%
-  dplyr::filter(area_C > 0) %>%
-  ggplot(
-    aes(x = factor(year), y = yield_C, fill = factor(year))
-  ) +
-  geom_boxplot(outlier.size=0.5) +
-  scale_fill_manual(values=c("1985"="#a38b00","1995"="#c9b84a","2006"="#e0cf7a","2017"="#edde8e"),
-                    guide="none") +
-  facet_wrap(~state, ncol=4, scales="free_y") +
-  labs(title    = "Beef yield distribution across years",
-       subtitle = paste0("Municipalities with pasture area > 0 ha"),
-       x="Year", y="tons / ha") +
-  theme_minimal() +
-  theme(axis.text.x = element_text(angle=45, hjust=1))
-
 # plot dispersion of yield_S (from IBGE's PAM)
 plot_box_S_years <- mun_yields_years %>%
   dplyr::filter(area_S > 0) %>%
@@ -311,8 +329,8 @@ plot_box_S_years <- mun_yields_years %>%
   scale_fill_manual(values=c("1985"="#7b3b63","1995"="#9e5c84","2006"="#b56d95","2017"="#C27BA0"),
                     guide="none") +
   facet_wrap(~state, ncol=4, scales="free_y") +
-  labs(title    = "Soybean yield (IBGE) distribution across years",
-       subtitle = paste0("Municipalities with soy area > 0 ha"),
+  labs(title    = "Soybean yield (tons/ha, IBGE)",
+       subtitle = paste0("Realized yield in census years\nMunicipalities with soy area > 0 ha"),
        x="Year", y="tons / ha") +
   theme_minimal() +
   theme(axis.text.x = element_text(angle=45, hjust=1))
@@ -333,29 +351,299 @@ plot_box_S_fao <- df_brazil_mun %>%
     aes(x = factor(state), y = FAO_soy_yield, fill = factor(state))
   ) +
   geom_boxplot(outlier.size=0.5) +
-  labs(title    = "Soybean yield (FAO) distribution (1981-2010)",
-       subtitle = paste0("Municipalities with soy area > 0 ha in 2017"),
+  labs(title    = "Soybean yield (tons/ha, FAO)",
+       subtitle = paste0("Avg. attainable yield in 1981-2010\nMunicipalities with soy area > 0 ha in 2017"),
        x="State", y="tons / ha", fill="State") +
   guides(fill="none") + # omit legent with state names
   theme_minimal() +
   theme(axis.text.x = element_text(angle=45, hjust=1))
 
 
-( plot_box_C_years | plot_box_S_years )
+( plot_box_S_years | plot_box_S_fao )
 
-plot_box_S_fao
+save_fig(plot_box_S_years, "states_yield_S_box_plot_yearly")
+save_fig(plot_box_S_fao,   "states_yield_S_box_plot_fao")
 
-save_fig(plot_box_C_years, "states_theta_C_box_plot_yearly")
-save_fig(plot_box_S_years, "states_theta_S_box_plot_yearly")
-save_fig(plot_box_S_fao,   "states_theta_S_box_plot_fao")
-
-rm(mun_yields, mun_yields_years, summarise_mun_yield_f,
+rm(mun_yields, summarise_mun_yield_f,
    df_mun_with_soy_area_2017, mun_with_soy_area_2017,
    mun_1985_yield, mun_1995_yield,
    mun_2006_yield, mun_2017_yield,
-   plot_box_C_years, plot_box_S_years, plot_box_S_fao)
+   plot_box_S_years, plot_box_S_fao)
 
 ```
+```{r mun_group_map, include=FALSE}
+
+# associate each municipality in the shapefile with a grouping code
+groups_sf <- cities_sf %>%
+  dplyr::left_join(
+    dplyr::select(df_brazil_mun,
+                  code_mun:group_2017, name_biome),
+    by = "code_mun"
+    )
+
+# create a shapefile for each municipality group and associate the geometries
+# with yield_C and yield_S
+
+groups_1985_sf <- groups_sf %>% 
+  dplyr::select(group=group_1985, geometry) %>% 
+  dplyr::group_by(group) %>%
+  dplyr::summarise(geometry=st_union(geometry)) %>%
+  dplyr::left_join(
+    dplyr::filter(mun_yields_years, year=="1985"),
+    by = "group"
+  )
+
+groups_1995_sf <- groups_sf %>% 
+  dplyr::select(group=group_1995, geometry) %>% 
+  dplyr::group_by(group) %>%
+  dplyr::summarise(geometry=st_union(geometry)) %>%
+  dplyr::left_join(
+    dplyr::filter(mun_yields_years, year=="1995"),
+    by = "group"
+  )
+
+groups_2006_sf <- groups_sf %>% 
+  dplyr::select(group=group_2006, geometry) %>% 
+  dplyr::group_by(group) %>%
+  dplyr::summarise(geometry=st_union(geometry)) %>%
+  dplyr::left_join(
+    dplyr::filter(mun_yields_years, year=="2006"),
+    by = "group"
+  )
+
+groups_2017_sf <- groups_sf %>% 
+  dplyr::select(group=group_2017, geometry) %>% 
+  dplyr::group_by(group) %>%
+  dplyr::summarise(geometry=st_union(geometry)) %>%
+  dplyr::left_join(
+    dplyr::filter(mun_yields_years, year=="2017"),
+    by = "group"
+  )
+
+rm(groups_sf)
+```
+
+```{r mun_yield_S_map, echo=FALSE}
+
+plot_yield_S_1985 <- groups_1985_sf %>%
+  ggplot() +
+  geom_sf(aes(fill=yield_S), color=NA) +
+  scale_fill_viridis_c(option = "magma", na.value="grey80") +
+  labs(title = "Soybean yield (1985)",
+       fill  = "tons/ha.")
+
+plot_yield_S_1995 <- groups_1995_sf %>%
+  ggplot() +
+  geom_sf(aes(fill=yield_S), color=NA) +
+  scale_fill_viridis_c(option = "magma", na.value="grey80") +
+  labs(title = "Soybean yield (1995)",
+       fill  = "tons/ha.")
+
+plot_yield_S_2006 <- groups_2006_sf %>%
+  ggplot() +
+  geom_sf(aes(fill=yield_S), color=NA) +
+  scale_fill_viridis_c(option = "magma", na.value="grey80") +
+  labs(title = "Soybean yield (2006)",
+       fill  = "tons/ha.")
+
+plot_yield_S_2017 <- groups_2017_sf %>%
+  ggplot() +
+  geom_sf(aes(fill=yield_S), color=NA) +
+  scale_fill_viridis_c(option = "magma", na.value="grey80") +
+  labs(title = "Soybean yield (2017)",
+       fill  = "tons/ha.")
+
+plot_yield_S_FAO <- cities_sf %>%
+  dplyr::left_join(df_brazil_mun, by="code_mun") %>%
+  ggplot() +
+  geom_sf(aes(fill=FAO_soy_yield), color=NA) +
+  scale_fill_viridis_c(option = "magma", na.value="grey80") +
+  labs(title = "Soybean yield (FAO)",
+       fill  = "tons/ha.")
+
+(plot_yield_S_1985 | plot_yield_S_1995)
+(plot_yield_S_2006 | plot_yield_S_2017)
+plot_yield_S_FAO
+
+save_fig(plot_yield_S_1985, "map_mun_yield_S_1985")
+save_fig(plot_yield_S_1995, "map_mun_yield_S_1995")
+save_fig(plot_yield_S_2006, "map_mun_yield_S_2006")
+save_fig(plot_yield_S_2017, "map_mun_yield_S_2017")
+save_fig(plot_yield_S_FAO,  "map_mun_yield_S_FAO")
+
+rm(plot_yield_S_1985, plot_yield_S_1995,
+   plot_yield_S_2006, plot_yield_S_2017,
+   plot_yield_S_FAO)
+
+```
+
+## Distribution of municipality-level cattle yield
+
+```{r mun_yield_C_distrib, echo=FALSE}
+# plot dispersion of yield_C (head of cattle per hectare)
+plot_box_C_years <- mun_yields_years %>%
+  dplyr::filter(area_C > 0) %>%
+  ggplot(
+    aes(x = factor(year), y = yield_C, fill = factor(year))
+  ) +
+  geom_boxplot(outlier.size=0.5) +
+  scale_fill_manual(values=c("1985"="#a38b00","1995"="#c9b84a","2006"="#e0cf7a","2017"="#edde8e"),
+                    guide="none") +
+  facet_wrap(~state, ncol=4, scales="free_y") +
+  labs(title    = "Cattle yield (head/hectare) distribution across years",
+       subtitle = paste0("Municipalities with pasture area > 0 ha"),
+       x="Year", y="tons / ha") +
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle=45, hjust=1))
+
+# check outliers
+plot_yield_C_outliers <- mun_yields_years %>%
+  dplyr::filter(
+    mb_pasture_ha > 0,
+    yield_C > 2
+    ) %>%
+  ggplot(aes(x     = mun_protected_area,
+             y     = yield_C,
+             color = state)) +
+  facet_wrap(~ year, ncol = 2) +
+  geom_point(size = 1.5, alpha = 0.8) +
+  labs(title    = "Cattle yield vs protected area share",
+       subtitle = "Municipalities with pasture area > 0 ha and cattle/ha > 2",
+       x        = "Protected area (%)",
+       y        = "Cattle yield (head/ha)",
+       color    = "State")
+
+save_fig(plot_box_C_years, "states_yield_C_box_plot_yearly")
+save_fig(plot_yield_C_outliers, "mun_yield_C_outliers")
+
+plot_box_C_years
+plot_yield_C_outliers
+
+rm(plot_box_C_years, plot_yield_C_outliers)
+```
+
+
+```{r mun_yield_C_map, echo=FALSE}
+# on scale_fill_viridis_c() with just arguments `option` and `na.value`, I end up with mostly black maps because of the outliers. There are two ways around it:
+# (1) add arguments `limits=c(0,4)` and `oob=scales::squish` to limit the color scale and make all outliers have the same color
+# (2) add argument `trans="log10"` to log the scale (useful for showing the full distribution while compressing outliers)
+
+
+# (1) CAP MAPS
+plot_yield_C_1985_cap <- groups_1985_sf %>%
+  ggplot() +
+  geom_sf(aes(fill=yield_C), color=NA) +
+  scale_fill_viridis_c(option = "magma", na.value="grey80", limits=c(0,2), oob=scales::squish) +
+  labs(title = "Cattle yield (1985, cap)",
+       fill  = "head/ha.")
+
+plot_yield_C_1995_cap <- groups_1995_sf %>%
+  ggplot() +
+  geom_sf(aes(fill=yield_C), color=NA) +
+  scale_fill_viridis_c(option = "magma", na.value="grey80", limits=c(0,2), oob=scales::squish) +
+  labs(title = "Cattle yield (1995, cap)",
+       fill  = "head/ha.")
+
+plot_yield_C_2006_cap <- groups_2006_sf %>%
+  ggplot() +
+  geom_sf(aes(fill=yield_C), color=NA) +
+  scale_fill_viridis_c(option = "magma", na.value="grey80", limits=c(0,2), oob=scales::squish) +
+  labs(title = "Cattle yield (2006, cap)",
+       fill  = "head/ha.")
+
+plot_yield_C_2017_cap <- groups_2017_sf %>%
+  ggplot() +
+  geom_sf(aes(fill=yield_C), color=NA) +
+  scale_fill_viridis_c(option = "magma", na.value="grey80", limits=c(0,2), oob=scales::squish) +
+  labs(title = "Cattle yield (2017, cap)",
+       fill  = "head/ha.")
+
+# (2) LOG MAPS
+plot_yield_C_1985_log <- groups_1985_sf %>%
+  ggplot() +
+  geom_sf(aes(fill=yield_C), color=NA) +
+  scale_fill_viridis_c(option = "magma", na.value="grey80", trans="log10") +
+  labs(title = "Cattle yield (1985, log)",
+       fill  = "head/ha.")
+
+plot_yield_C_1995_log <- groups_1995_sf %>%
+  ggplot() +
+  geom_sf(aes(fill=yield_C), color=NA) +
+  scale_fill_viridis_c(option = "magma", na.value="grey80", trans="log10") +
+  labs(title = "Cattle yield (1995, log)",
+       fill  = "head/ha.")
+
+plot_yield_C_2006_log <- groups_2006_sf %>%
+  ggplot() +
+  geom_sf(aes(fill=yield_C), color=NA) +
+  scale_fill_viridis_c(option = "magma", na.value="grey80", trans="log10") +
+  labs(title = "Cattle yield (2006, log)",
+       fill  = "head/ha.")
+
+plot_yield_C_2017_log <- groups_2017_sf %>%
+  ggplot() +
+  geom_sf(aes(fill=yield_C), color=NA) +
+  scale_fill_viridis_c(option = "magma", na.value="grey80", trans="log10") +
+  labs(title = "Cattle yield (2017, log)",
+       fill  = "head/ha.")
+
+# show plots, save figures, remove objects
+(plot_yield_C_1985_cap | plot_yield_C_1985_log)
+(plot_yield_C_1995_cap | plot_yield_C_1995_log)
+(plot_yield_C_2006_cap | plot_yield_C_2006_log)
+(plot_yield_C_2017_cap | plot_yield_C_2017_log)
+
+save_fig(plot_yield_C_1985_cap, "map_mun_yield_C_1985_cap")
+save_fig(plot_yield_C_1995_cap, "map_mun_yield_C_1995_cap")
+save_fig(plot_yield_C_2006_cap, "map_mun_yield_C_2006_cap")
+save_fig(plot_yield_C_2017_cap, "map_mun_yield_C_2017_cap")
+
+save_fig(plot_yield_C_1985_log, "map_mun_yield_C_1985_log")
+save_fig(plot_yield_C_1995_log, "map_mun_yield_C_1995_log")
+save_fig(plot_yield_C_2006_log, "map_mun_yield_C_2006_log")
+save_fig(plot_yield_C_2017_log, "map_mun_yield_C_2017_log")
+
+rm(plot_yield_C_1985_cap, plot_yield_C_1985_log,
+   plot_yield_C_1995_cap, plot_yield_C_1995_log,
+   plot_yield_C_2006_cap, plot_yield_C_2006_log,
+   plot_yield_C_2017_cap, plot_yield_C_2017_log)
+
+rm(groups_1985_sf, groups_1995_sf,
+   groups_2006_sf, groups_2017_sf,
+   mun_yields_years)
+```
+
+<!--
+## Comparing IBGE's datasets
+
+The PAM and PPM surveys get municipality-level yearly data on crops and cattle farms for 1974-2024 (though I only use data for 1985-2024), while the Agriculture Census gets municipality-level data on all farms about once a decade since 1920 (though I only use data from 1985, 1995, 2006, and 2017). Below, I compare the numbers for soybean yield (in tons per hectare) and cattle yield (in cattle head per hectare) from both data sources for 1995, 2006 and 2017. I also consider Mapbiomas' municipality-level LULC data to check how far it is from official IBGE numbers for pasture area and soybean/crop area.
+
+```{r compare_IBGE, echo=FALSE}
+
+#yearly_data <- df_yearly_mun %>%
+#  dplyr::filter(
+#    year %in% c(1995,2006,2017)
+#    ) %>%
+#  dplyr::select(
+#    code_mun, group_1995, group_2006, group_2017, code_amc,
+#    name_mun, state, name_micro, name_meso, legal_amazon, year,
+#    pam_area_ha, pam_output_ton, ppm_herd,
+#    mb_pasture_ha, mb_soybean_ha, mb_tcrop_ha, mb_pcrop_ha
+#  )
+#
+#census_data <- df_census_mun %>%
+#  dplyr::filter(
+#    area_group == "total",
+#    day_group == "total"
+#  ) %>%
+#  dplyr::select(
+#    code_mun, year,
+#    activity_group,
+#    farm_area_ha, n_farms, activity_area
+#  )
+
+```
+-->
 
 # Land Use and Cover Change
 ## Brazil
