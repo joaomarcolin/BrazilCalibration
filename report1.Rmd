@@ -321,7 +321,7 @@ mun_yields_years <- rbind(mun_1985_yield, mun_1995_yield,
 
 ## histogram
 #mun_yields_years %>%
-#  dplyr::filter(year==1985)
+#  dplyr::filter(year==1985) %>%
 #  ggplot(aes(x = yield_S)) +
 #  geom_histogram(bins=50) +
 #  # scale_x_log10() + # log scale to make it visible
@@ -329,7 +329,7 @@ mun_yields_years <- rbind(mun_1985_yield, mun_1995_yield,
 #
 ## density plot
 #mun_yields_years %>%
-#  dplyr::filter(year==1985)
+#  dplyr::filter(year==1985) %>%
 #  ggplot(aes(x = yield_S)) +
 #  # scale_x_log10() + # log scale to make it visible
 #  geom_density() +
@@ -499,7 +499,7 @@ rm(plot_yield_S_1985, plot_yield_S_1995,
 
 ## histogram
 #mun_yields_years %>%
-#  dplyr::filter(year==1985)
+#  dplyr::filter(year==1985) %>%
 #  ggplot(aes(x = yield_C)) +
 #  geom_histogram(bins=50) +
 #  # scale_x_log10() + # log scale to make it visible
@@ -507,7 +507,7 @@ rm(plot_yield_S_1985, plot_yield_S_1995,
 #
 ## density plot
 #mun_yields_years %>%
-#  dplyr::filter(year==1985)
+#  dplyr::filter(year==1985) %>%
 #  ggplot(aes(x = yield_C)) +
 #  geom_density() +
 #  # scale_x_log10() + # log scale to make it visible

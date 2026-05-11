@@ -25,6 +25,7 @@ if (!dir.exists("data_outputs/2_brazil_mun"))   dir.create("data_outputs/2_brazi
 if (!dir.exists("data_outputs/3_census_data"))  dir.create("data_outputs/3_census_data")
 if (!dir.exists("data_outputs/4_yearly_data"))  dir.create("data_outputs/4_yearly_data")
 if (!dir.exists("data_outputs/5_final_data"))   dir.create("data_outputs/5_final_data")
+if (!dir.exists("data_outputs/results"))        dir.create("data_outputs/results")
 
 # report data sources
 rmarkdown::render("data_sources.Rmd", output_file = "data_sources.html", quiet=TRUE)
@@ -94,9 +95,8 @@ rmarkdown::render("report1.Rmd", output_file = "report1.html")
 # manipulate data to prepare model initialization
 source("scripts/final_output.R")
 # saves results
-readr::write_csv(df_brazil_mun,    "results/df_brazil_mun.csv")
-readr::write_csv(df_census_mun,    "results/df_census_mun.csv")
-readr::write_csv(df_yearly_mun,    "results/df_yearly_mun.csv")
-readr::write_csv(df_yearly_prices, "results/df_yearly_prices.csv")
-readr::write_csv(df_grid,   paste0("results/grid_df_brazil_",param_plot_km,"km.csv"))
-sf::st_write(sf_grid,       paste0("results/grid_sf_brazil_",param_plot_km,"km.shp"), delete_layer=TRUE)
+readr::write_csv(df_census_mun,    "data_outputs/results/df_census_mun.csv")
+readr::write_csv(df_yearly_mun,    "data_outputs/results/df_yearly_mun.csv")
+readr::write_csv(df_yearly_prices, "data_outputs/results/df_yearly_prices.csv")
+readr::write_csv(df_grid,   paste0("data_outputs/results/grid_df_brazil_",param_plot_km,"km.csv"))
+sf::st_write(sf_grid,       paste0("data_outputs/results/grid_sf_brazil_",param_plot_km,"km.shp"), delete_layer=TRUE)

@@ -259,7 +259,33 @@ rm(mun_1985_yield, mun_1995_yield,
    df_yield_C)
 rm(outlier_1985, outlier_1995,
    outlier_2006, outlier_2017)
-# (4) fix outliers in df_yearly_mun ---------------------------------------
+
+
+# (4) add 'state' and 'name_biome' column to grid -------------------------
+df_grid <- df_grid %>%
+  dplyr::left_join(
+    dplyr::select(df_brazil_mun, code_mun, state),
+    by = "code_mun"
+  ) %>% 
+  dplyr::mutate(
+    code_biome = dplyr::replace_values(
+      code_biome,
+      "1" ~ "amazon",
+      "2" ~ "caatinga",
+      "3" ~ "cerrado",
+      "4" ~ "atlantic",
+      "5" ~ "pampa",
+      "6" ~ "pantanal"
+      )
+  ) %>%
+  dplyr::select(
+    cell_id, code_mun,
+    name_biome = code_biome,
+    state, year,
+    pub_area:theta_C
+  )
+
+# (5) fix outliers in df_yearly_mun ---------------------------------------
 ## auxiliary function to summarise table by group/period and calculate yield
 #summarise_yearly_f <- function(yr, period) {
 #  # define grouping column
@@ -318,8 +344,5 @@ rm(outlier_1985, outlier_1995,
 #  ggplot(aes(x = yield_C)) +
 #  geom_density() +
 #  theme_minimal()
-
-
-
 
 

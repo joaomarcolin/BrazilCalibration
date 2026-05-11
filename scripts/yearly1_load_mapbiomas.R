@@ -73,5 +73,10 @@ mapbiomas_data <- mapbiomas_data %>%
   tidyr::pivot_wider(
     names_from  = class,
     values_from = area
+  ) %>%
+  # some municipalities don't have some of the classes of LULC, so they show up as NA
+  # but they should show up as 0 - fix it
+  dplyr::mutate(
+    across(everything(), ~ replace_na(.x, 0))
   )
   
