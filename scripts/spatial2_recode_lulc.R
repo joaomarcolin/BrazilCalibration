@@ -17,12 +17,12 @@ reclass_matrix <- base::rbind(
   # first column defines original value, second column defines the new value
   c(0,0),                                  # 0: background
   c(3,1),c(4,1),c(5,1),c(6,1),c(11,1),     # 1: natural cover
-  c(12,1),c(29,1),c(32,1),c(49,1),c(50,1), #    idem
-  c(15,2),c(21,2),                         # 2: pasture
+  c(29,1),c(32,1),c(49,1),c(50,1),c(13,1), #    idem
+  c(15,2),c(21,2),c(12,2),                 # 2: pasture
   c(20,3),c(39,3),c(40,3),c(41,3),c(62,3), # 3: temporary crops
   c(35,4),c(46,4),c(47,4),c(48,4),         # 4: perennial crops
   c(9,5),                                  # 5: forest plantation
-  c(13,6),c(23,6),c(24,6),c(25,6),         # 6: non-vegetated
+  c(23,6),c(24,6),c(25,6),                 # 6: non-vegetated
   c(30,6),c(31,6),c(33,6),c(75,6)          #    idem
 )
 
