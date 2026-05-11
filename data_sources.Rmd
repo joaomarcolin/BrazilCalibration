@@ -42,6 +42,24 @@ theme_set(theme_grey())
   - Sexo = "Total"
   - Ano = "1995"
   - Unidade Territorial = "Município"
+- [table 323](https://sidra.ibge.gov.br/tabela/323): cattle herd (head of cattle), `data_inputs/IBGE/agriculture_census/1995/tab323.xlsx`
+  - Variável = "Efetivo dos rebanhos (Cabeças)"
+  - Grupos de área total = "Total"
+  - Espécie de rebanho da pecuária = "Bovinos"
+  - Ano = "1995"
+  - Unidade Territorial = "Município"
+- [table 495](https://sidra.ibge.gov.br/tabela/495): soybean output (tons), `data_inputs/IBGE/agriculture_census/1995/tab495.xlsx`
+  - Variável = "Quantidade produzida (...)"
+  - Produtos da lavoura temporária = "Soja em grão (Toneladas)"
+  - Condição do produtor em relação às terras = "Total"
+  - Ano = "1995"
+  - Unidade Territorial = "Município"
+- [table 501](https://sidra.ibge.gov.br/tabela/501): soybean crop area (hectares), `data_inputs/IBGE/agriculture_census/1995/tab501.xlsx`
+  - Variável = "Área colhida (Hectares)"
+  - Produtos da lavoura temporária = "Soja em grão"
+  - Condição do produtor em relação às terras = "Total"
+  - Ano = "1995"
+  - Unidade Territorial = "Município"
 
 ### 2006
 - [table 263](https://sidra.ibge.gov.br/tabela/263): farm number and farm area by area group, `data_inputs/IBGE/agriculture_census/2006/tab263_XXXX.xlsx`, where `XXXX` is `1985`, `1995`, or `2006`
@@ -64,6 +82,23 @@ theme_set(theme_grey())
   - Grupos de área total = "Total"
   - Ano = "2006"
   - Unidade Territorial = "Município"
+- [table 822](https://sidra.ibge.gov.br/tabela/822): soybean area (hectares) and output (tons), `data_inputs/IBGE/agriculture_census/2006/tab822.xlsx`
+  - Variável = "Quantidade produzida (...)" and "Área Colhida (Hectares)"
+  - Produtos da lavoura temporária = "Soja em grão (Toneladas)"
+  - Condição do produtor em relação às terras = "Total"
+  - Grupos de atividade econômica = "Total"
+  - Grupos de área total = "Total"
+  - Grupos de área colhida = "Total"
+  - Ano = "2006"
+  - Unidade Territorial = "Município"
+- [table 960](https://sidra.ibge.gov.br/tabela/960): cattle herd (head of cattle), `data_inputs/IBGE/agriculture_census/2006/tab960.xlsx`
+  - Variável = "Número de cabeças (Cabeças)"
+  - Espécie da pecuária = "Bovinos"
+  - Condição do produtor em relação às terras = "Total"
+  - Grupos de atividade econômica = "Total"
+  - Grupos de área total = "Total"
+  - Ano = "2006"
+  - Unidade Territorial = "Município"
 
 ### 2017
 - [table 6880](https://sidra.ibge.gov.br/tabela/6880): farm number and farm area by area group and activity group, `data_inputs/IBGE/agriculture_census/2017/tab6880_farms_X.xlsx` and `data_inputs/IBGE/agriculture_census/2017/tab6880_area_X.xlsx`, where `X` goes from `1` to `6`
@@ -83,6 +118,22 @@ theme_set(theme_grey())
   - Grupos de atividade econômica = "Total", "Produção de lavouras temporárias", "Produção de lavouras permanentes", "Pecuária...", "Produção florestal...";
   - Ano = "2017"
   - Unidade Territorial = "Município"
+- [table 6957](https://sidra.ibge.gov.br/tabela/6957): soybean output (tons) and crop area (hectares), `data_inputs/IBGE/agriculture_census/2017/tab6957.xlsx`
+  - Variável = "Quantidade produzida nas lavouras temporárias (...)" and "Área colhida nas lavouras temporárias (Hectares)"
+  - Tipologia = "Total"
+  - Produtos da lavoura temporária = "Soja em grão (Toneladas)"
+  - Condição do produtor em relação às terras = "Total"
+  - Grupos de atividade econômica = "Total"
+  - Ano = "2017"
+  - Unidade Territorial = "Município"
+- [table 6907](https://sidra.ibge.gov.br/tabela/6907): cattle herd (head of cattle), `data_inputs/IBGE/agriculture_census/2017/tab6907.xlsx`
+  - Variável = "Número de cabeças (Cabeças)"
+  - Tipologia = "Total"
+  - Espécie da pecuária = "Bovinos"
+  - Condição do produtor em relação às terras = "Total"
+  - Ano = "2017"
+  - Unidade Territorial = "Município"
+
   
 ## Geographic Information
 - IBGE's [2024 shapefiles](https://www.ibge.gov.br/geociencias/organizacao-do-territorio/malhas-territoriais/15774-malhas.html): municipality and state shapefiles for 2024, `data_inputs/IBGE/spatial/BR_Municipios_2024.shp` and `data_inputs/IBGE/spatial/BR_UF_2024.shp`
@@ -109,7 +160,7 @@ theme_set(theme_grey())
   - dados geoespaciais, Terras Indígenas no Brasil (shp)
 - Imaflora's [land tenure geopackage](https://atlasagropecuario.imaflora.org/downloads): polygons with all rural properties in Imaflora's 2017 dataset, `data_inputs/Imaflora/pa_br_landtenure_imaflora_2021.gpkg`
   - land tenure boundaries, download, full data
-- FAO GAEZ's [attainable soybean yield raster](https://gaez.fao.org/pages/data-viewer): raster of XXX m x XXX m pixels associated with a value for soybean yield (in kg per hectare), `data_inputs/FAO/ylHr_soy.tif`
+- FAO GAEZ's [attainable soybean yield raster](https://gaez.fao.org/pages/data-viewer): raster of 5 arc-minutes pixels (aproximately 9km x 9km) associated with a value for the average attainable soybean yield (in kg per hectare) for 1981-2010, `data_inputs/FAO/ylHr_soy.tif`
   - suitability and attainable yield
   - Sub-Theme = "Agro-ecological Attainable Yield"
   - Variable = "Output density"

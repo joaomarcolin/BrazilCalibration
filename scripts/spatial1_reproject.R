@@ -13,11 +13,12 @@
 ## Mapbiomas' rasters take a very long time: about 3h30min per year (for the whole of Brazil)
 
 # (1) IBGE ----------------------------------------------------------------
+tic("Reproject IBGE's shapefiles")
 # (1.1) reproject from EPSG4674 (geographic) to EPSG5880 (metric)
 # open original shapefile
-cities_sf <- sf::st_read("data_inputs/IBGE/spatial/BR_Municipios_2024.shp")
-states_sf <- sf::st_read("data_inputs/IBGE/spatial/BR_UF_2024.shp")
-biomes_sf <- sf::st_read("data_inputs/IBGE/spatial/IBGE_biomas_v2025_dominios_vetor_e250K.shp")
+cities_sf <- sf::st_read("data_inputs/IBGE/spatial/BR_Municipios_2024.shp", quiet=TRUE)
+states_sf <- sf::st_read("data_inputs/IBGE/spatial/BR_UF_2024.shp", quiet=TRUE)
+biomes_sf <- sf::st_read("data_inputs/IBGE/spatial/IBGE_biomas_v2025_dominios_vetor_e250K.shp", quiet=TRUE)
 # reproject
 cities_sf <- sf::st_transform(cities_sf, crs=5880)
 states_sf <- sf::st_transform(states_sf, crs=5880)
@@ -105,16 +106,18 @@ brazil_sf <- biomes_sf %>%
   sf::st_as_sf()
 
 # (1.6) save reprojected shapefile and clean up
-sf::st_write(cities_sf, "data_outputs/1_cell_grid/1_reproject/cities_EPSG5880.shp", delete_layer=TRUE)
-sf::st_write(states_sf, "data_outputs/1_cell_grid/1_reproject/states_EPSG5880.shp", delete_layer=TRUE)
-sf::st_write(brazil_sf, "data_outputs/1_cell_grid/1_reproject/brazil_EPSG5880.shp", delete_layer=TRUE)
-sf::st_write(biomes_sf, "data_outputs/1_cell_grid/1_reproject/biomes_EPSG5880.shp", delete_layer=TRUE)
+sf::st_write(cities_sf, "data_outputs/1_cell_grid/1_reproject/cities_EPSG5880.shp", delete_layer=TRUE, quiet=TRUE)
+sf::st_write(states_sf, "data_outputs/1_cell_grid/1_reproject/states_EPSG5880.shp", delete_layer=TRUE, quiet=TRUE)
+sf::st_write(brazil_sf, "data_outputs/1_cell_grid/1_reproject/brazil_EPSG5880.shp", delete_layer=TRUE, quiet=TRUE)
+sf::st_write(biomes_sf, "data_outputs/1_cell_grid/1_reproject/biomes_EPSG5880.shp", delete_layer=TRUE, quiet=TRUE)
 rm(cities_sf, states_sf, brazil_sf, biomes_sf)
+toc()
 
 # (2) Conservation Units and Indigenous Territories -----------------------
+tic("Reproject CNUC and FUNAI's shapefiles")
 # open original shapefiles
-cnuc_sf  <- sf::st_read("data_inputs/CNUC/cnuc_2025_08.shp")
-funai_sf <- sf::st_read("data_inputs/FUNAI/tis_poligonaisPolygon.shp")
+cnuc_sf  <- sf::st_read("data_inputs/CNUC/cnuc_2025_08.shp", quiet=TRUE)
+funai_sf <- sf::st_read("data_inputs/FUNAI/tis_poligonaisPolygon.shp", quiet=TRUE)
 
 # reproject
 cnuc_sf  <- sf::st_transform(cnuc_sf,  crs = 5880)
@@ -133,10 +136,12 @@ protected_areas_sf <- rbind(cnuc_sf, funai_sf) %>%
   dplyr::select(polygon = x) # only keep the polygons
 
 # save output and clean up
-sf::st_write(protected_areas_sf, "data_outputs/1_cell_grid/1_reproject/protected_areas_EPSG5880.shp", delete_layer=TRUE)
+sf::st_write(protected_areas_sf, "data_outputs/1_cell_grid/1_reproject/protected_areas_EPSG5880.shp", delete_layer=TRUE, quiet=TRUE)
 rm(cnuc_sf, funai_sf, protected_areas_sf)
+toc()
 
 # (3) FAO GAEZ attainable yield -------------------------------------------
+tic("Reproject FAO GAEZ's raster")
 # load data (for the whole world)
 fao_rast <- terra::rast("data_inputs/FAO/ylHr_soy.tif")
 
@@ -155,7 +160,7 @@ fao_brazil_rast <- terra::project(fao_brazil_rast, y = "epsg:5880", method = "bi
 terra::writeRaster(fao_brazil_rast, "data_outputs/1_cell_grid/1_reproject/fao_brazil_soy_yield.tif", overwrite=TRUE)
 # clean up
 rm(fao_rast, brazil_sf, fao_brazil_rast)
-
+toc()
 
 # (4) Mapbiomas -----------------------------------------------------------
 # reproject from EPSG4326 (geographic) to EPSG5880 (metric)

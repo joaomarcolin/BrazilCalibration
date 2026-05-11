@@ -4,7 +4,7 @@
 # (1) load grid, load raster and set output path --------------------------
 terraOptions(progress = 1) # shows progress bar
 # load grid
-sf_grid <- sf::st_read(paste0("data_outputs/1_cell_grid/5_grid_lulc/brazil_grid_lulc_",param_plot_km,"km.shp"))
+sf_grid <- sf::st_read(paste0("data_outputs/1_cell_grid/5_grid_lulc/brazil_grid_lulc_",param_plot_km,"km.shp"), quiet=TRUE)
 # load raster
 soy_rast <- terra::rast("data_outputs/1_cell_grid/1_reproject/fao_brazil_soy_yield.tif")
 # check coordinate reference systems

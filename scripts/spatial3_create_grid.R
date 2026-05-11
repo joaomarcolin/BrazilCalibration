@@ -1,9 +1,11 @@
 # 2025 09 22
 # This script creates a regular grid from Brazil's shapefile and parameter 'param_plot_km'
 
+tic(paste("Create grid at",param_plot_km,"km resolution"))
+
 # (1) load area that should be divided ------------------------------------
 # consider the whole country
-area_sf <- sf::st_read("data_outputs/1_cell_grid/1_reproject/brazil_EPSG5880.shp") %>%
+area_sf <- sf::st_read("data_outputs/1_cell_grid/1_reproject/brazil_EPSG5880.shp", quiet=TRUE) %>%
            dplyr::select(geometry)
   
 # (2) Create grid template and initialize cells ---------------------------
@@ -30,28 +32,29 @@ names(grid_sf)[1] <- "cell_id"
 
 # (3) Check plot overlap with area shapefile ------------------------------
 # create high-resolution raster (1km) for accurate area calculations
-# rasterize() requires a resolution in meters and param_plot_km is in kilometers
-if (param_plot_km>=3) {
-  area_rast2 <- terra::rasterize(
-                  area_rast,
-                  rast(ext(area_rast),
-                  res=1000,
-                  crs=crs(area_rast)),
-                  field=1
-                )
-  # calculate actual overlap area (in km2) between each grid cell and Brazil
-  grid_sf$overlap_area <- exactextractr::exact_extract(area_rast2, grid_sf,
-                                                       fun='sum',
-                                                       progress=TRUE)
-  grid_sf$plot_area <- param_plot_km^2
-  grid_sf$overlap_fraction <- grid_sf$overlap_area/grid_sf$plot_area
-  # with param_plot_km==5, 3983 out of the 347086 plots (1.15% of the total)
-  # have less than 75% of their area within Brazil.
-  # I treat these plots as background and ignore them
-  # identify cells with >75% overlap with Brazil's territory
-  valid_ids <- grid_sf$cell_id[grid_sf$overlap_fraction>0.75]
-  rm(area_rast2)
-} else {
+# rasterize() requires a resolution in meters and param_plot_km is in kilometers #########################################################
+
+#if (param_plot_km>=3) {
+#  area_rast2 <- terra::rasterize(
+#                  area_rast,
+#                  rast(ext(area_rast),
+#                  res=1000,
+#                  crs=crs(area_rast)),
+#                  field=1
+#                )
+#  # calculate actual overlap area (in km2) between each grid cell and Brazil
+#  grid_sf$overlap_area <- exactextractr::exact_extract(area_rast2, grid_sf,
+#                                                       fun='sum',
+#                                                       progress=TRUE)
+#  grid_sf$plot_area <- param_plot_km^2
+#  grid_sf$overlap_fraction <- grid_sf$overlap_area/grid_sf$plot_area
+#  # with param_plot_km==5, 3983 out of the 347086 plots (1.15% of the total)
+#  # have less than 75% of their area within Brazil.
+#  # I treat these plots as background and ignore them
+#  # identify cells with >75% overlap with Brazil's territory
+#  valid_ids <- grid_sf$cell_id[grid_sf$overlap_fraction>0.75]
+#  rm(area_rast2)
+#} else {
   # if the plots are too small, just consider the centroid: if it's inside area_sf,
   # the cell is included
   centroids <- sf::st_centroid(grid_sf)
@@ -61,7 +64,7 @@ if (param_plot_km>=3) {
   grid_sf$overlap_fraction <- as.numeric(inside)
   valid_ids <- grid_sf$cell_id[inside]
   rm(centroids, inside)
-} # closes if-else
+#} # closes if-else
 
 # remove cells with <=75% overlap
 grid_rast[!grid_rast %in% valid_ids] <- NA

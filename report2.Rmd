@@ -1,16 +1,14 @@
 ---
 title: "AgriCerrado Calibration Report"
 author: "João Marcolin"
-date: "28/04/2026"
+date: "10/05/2026"
 output: html_document
 ---
-```{r setup, include=FALSE}
-knitr::opts_chunk$set(echo = FALSE, message = FALSE, warning = FALSE, out.width='800px')
-```
 
-```{r load}
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE, message = FALSE, warning = FALSE, out.width='100%')
+
 library(magrittr)
-require(tidyverse)
 library(knitr)
 library(pander)
 library(reshape2)
@@ -20,164 +18,188 @@ library(patchwork)
 library(scales)
 theme_set(theme_grey())
 
-## define auxiliary function to save figures
-# picks a folder to save the figures (if necessary, create the folder)
-if (!dir.exists("figures")) dir.create("figures")
+# This script requires parameters "aoi_name", "param_plot_km", "set_aoi", "set_subset_by", defined in script "export.R"
 # auxiliary function for saving figures
 save_fig <- function(plot, name, width = 8, height = 6, dpi = 500) {
-  ggsave(paste0("figures/", name, ".png"), plot = plot, width = width, height = height, dpi = dpi)
+  ggsave(paste0(path_figures,"/", name, ".png"), plot = plot, width = width, height = height, dpi = dpi)
 }
-
-## load inputs
-df_census_state <- readr::read_csv(
-                     "results/df_census_state.csv",
-                     col_types = cols(
-                       .default      = col_character(),
-                       farm_area_ha  = col_number(),
-                       n_farms       = col_number(),
-                       activity_area = col_number(),
-                       workers       = col_number()
-                       )
-                     ) %>%
-                   dplyr::filter(
-                     state %in% report_states
-                   )
-
-df_yearly_prices <- readr::read_csv(
-                      "results/df_yearly_prices.csv",
-                      col_types = cols(
-                       .default = col_number(),
-                       year     = col_character()
-                       )
-                      )
-
-df_municipalities <- readr::read_csv(
-                       "results/df_municipalities.csv",
-                       col_types = cols(
-                         .default     = col_character(),
-                         legal_amazon = col_logical(),
-                         amazon_area_km2        = col_number(),
-                         atlantic_area_km2      = col_number(),
-                         caatinga_area_km2      = col_number(),
-                         cerrado_area_km2       = col_number(),
-                         islands_area_km2       = col_number(),
-                         pampa_area_km2         = col_number(),
-                         pantanal_area_km2      = col_number(),
-                         mun_area_km2           = col_number(),
-                         mun_protected_area_km2 = col_number(),
-                         yield_C                = col_number(),
-                         yield_S_pam            = col_number(),
-                         yield_S_mb             = col_number()
-                         )
-                       ) %>%
-                     dplyr::filter(
-                       state %in% report_states
-                       )
-
-```
-
-# Spatial data
-Using:
-- Mapbiomas' LULC rasters for 1985, 1990, 1996, 2006, 2017 and 2024;
-- IBGE's, CNUC's and FUNAI's shapefiles.
-I was able to partition Brazil in 5km x 5km plots, each of them associated with a few variables of interest. Below, I show a few results only for 1985 and restricted to states with significant Cerrado area. The data is available for the whole country for the years 1985, 1990, 1996, 2006, 2017 and 2024.
-
-```{r spatial_data, echo=FALSE, fig.width=14, fig.height=12}
-# default fig.width=7, making the figure wider must make it easier to plot the scales
-#
-# this sections needs param_year and report_states
-
-# filter grid_vars to the selected year
-grid_vars2 <- grid_vars %>%
-  dplyr::filter(year == param_year) %>%
-  dplyr::select(-year) %>%
-  dplyr::mutate(cv_I = cv_I_C + cv_I_S + cv_I_F)
-
-# identify cells belonging to the selected states
-mun_codes_spatial <- MUN_data %>%
-  dplyr::filter(state %in% report_states) %>%
-  dplyr::pull(code_mun) %>%
-  base::unique()
-
-grid_vars2 <- grid_vars2 %>%
-  dplyr::filter(code_mun %in% mun_codes_spatial)
-
-# join geometry and variables
-grid_sf <- grid_geom %>%
-  dplyr::filter(cell_id %in% grid_vars2$cell_id) %>%
-  dplyr::left_join(grid_vars2, by="cell_id")
 
 # shared map theme — removes axis clutter for spatial figures
 theme_map <- theme_void() +
   theme(legend.position  = "right",
         legend.key.height = unit(1.2, "cm"),
         legend.key.width  = unit(0.4, "cm"),
-        plot.title        = element_text(size=10, face="bold", hjust=0.5),
+        plot.title        = element_text(size=16, face="bold", hjust=0.5),
         plot.margin       = margin(2,2,2,2))
+
+```
+
+```{r load_dataframes, include=FALSE}
+#df_census_aoi <- readr::read_csv(
+#  paste0(path_output,"/census_data_",aoi_name,".csv"),
+#  col_types = cols(
+#    .default      = col_character(),
+#    legal_amazon  = col_logical(),
+#    year          = col_number(),
+#    farm_area_ha  = col_number(),
+#    n_farms       = col_number(),
+#    activity_area = col_number(),
+#    workers       = col_number()
+#    )
+#  )
+#
+#df_yearly_aoi <- readr::read_csv(
+#  paste0(path_output,"/yearly_data_",aoi_name,".csv"),
+#  col_types = cols(
+#    .default     = col_character(),
+#    legal_amazon = col_logical(),
+#    year         = col_number(),
+#    area_S  = col_number(),
+#    tons_S  = col_number(),
+#    herd_C  = col_number(),
+#    area_C  = col_number(),
+#    mun_V   = col_number(),
+#    mun_I   = col_number(),
+#    mun_I_C = col_number(),
+#    mun_I_S = col_number(),
+#    mun_I_F = col_number(),
+#    mun_D   = col_number()
+#    )
+#  )
+#
+#df_yearly_prices <- readr::read_csv(
+#  paste0(path_output,"/time_series.csv"),
+#  col_types = cols(.default = col_number())
+#  )
+```
+
+```{r load_grid, include=FALSE}
+# load grid variables
+df_grid <- readr::read_csv(
+  paste0(path_output,"/cell_data_",aoi_name,"_",param_plot_km,"km.csv"),
+  col_types = cols(
+    .default   = col_number(),
+    cell_id    = col_character(),
+    code_mun   = col_character(),
+    name_biome = col_character(),
+    state      = col_character()
+    )
+  )
+
+# load grid geometry
+grid_sf <- sf::st_read(paste0(path_output,"/cell_grid_",aoi_name,"_",param_plot_km,"km.shp"), quiet=TRUE)
+grid_sf$cell_id <- as.character(grid_sf$cell_id)
+
+# join geometry and variables
+grid_sf <- grid_sf %>%
+  dplyr::left_join(df_grid, by="cell_id")
+rm(df_grid)
+
+```
+
+# Visualize cell grid
+<!--
+Using:
+- Mapbiomas' LULC rasters for 1985, 1990, 1996, 2006, 2017 and 2024;
+- IBGE's, CNUC's and FUNAI's shapefiles.
+I was able to partition Brazil in 5km x 5km plots, each of them associated with a few variables of interest. Below, I show a few results only for 1985 and restricted to states with significant Cerrado area. The data is available for the whole country for the years 1985, 1990, 1996, 2006, 2017 and 2024.
+-->
+
+## LULC
+```{r visualize_grid_LULC, echo=FALSE, fig.width=14, fig.height=21}
+#Single map:            fig.width=10, fig.height=8
+#Two maps side by side: fig.width=14, fig.height=7
+#Two rows of two maps:  fig.width=14, fig.height=14
 
 # (1) cv_V — natural vegetation cover
 # colorblind-safe: viridis "viridis" (yellow-green-blue)
-fig_cv_V <- ggplot(grid_sf) +
+fig_cv_V_1985 <- grid_sf %>%
+  dplyr::filter(year==1985) %>%
+  ggplot() +
   geom_sf(aes(fill=cv_V), color=NA) +
   scale_fill_viridis_c(option="viridis", limits=c(0,1),
                        labels=scales::percent, name="") +
-  labs(title="Natural vegetation (cv_V)") +
+  labs(title="Natural vegetation (1985)") +
   theme_map
+
+fig_cv_V_2024 <- grid_sf %>%
+  dplyr::filter(year==2024) %>%
+  ggplot() +
+  geom_sf(aes(fill=cv_V), color=NA) +
+  scale_fill_viridis_c(option="viridis", limits=c(0,1),
+                       labels=scales::percent, name="") +
+  labs(title="Natural vegetation (2024)") +
+  theme_map
+
 
 # (2) cv_I — farming area
 # colorblind-safe: viridis "rocket" (white-orange-dark red)
-fig_cv_I <- ggplot(grid_sf) +
+fig_cv_I_1985 <- grid_sf %>%
+  dplyr::filter(year==1985) %>%
+  ggplot() +
   geom_sf(aes(fill=cv_I), color=NA) +
   scale_fill_viridis_c(option="rocket", direction=-1, limits=c(0,1),
                        labels=scales::percent, name="") +
-  labs(title="Farming area (cv_I)") +
+  labs(title="Farming area (1985)") +
+  theme_map
+
+fig_cv_I_2024 <- grid_sf %>%
+  dplyr::filter(year==2024) %>%
+  ggplot() +
+  geom_sf(aes(fill=cv_I), color=NA) +
+  scale_fill_viridis_c(option="rocket", direction=-1, limits=c(0,1),
+                       labels=scales::percent, name="") +
+  labs(title="Farming area (2024)") +
   theme_map
 
 # (3) cv_D — deforested abandoned area
 # colorblind-safe: viridis "mako" (white-teal-dark blue)
-fig_cv_D <- ggplot(grid_sf) +
+fig_cv_D_1985 <- grid_sf %>%
+  dplyr::filter(year==1985) %>%
+  ggplot() +
   geom_sf(aes(fill=cv_D), color=NA) +
   scale_fill_viridis_c(option="mako", direction=-1, limits=c(0,1),
                        labels=scales::percent, name="") +
-  labs(title="Abandoned area (cv_D)") +
+  labs(title="Abandoned area (1985)") +
   theme_map
 
-# (4) yield_C — beef yield
-# sqrt transform reduces dominance of high-yield outliers
-fig_yield_C <- ggplot(grid_sf) +
-  geom_sf(aes(fill=yield_C), color=NA) +
-  scale_fill_viridis_c(option="plasma", trans="sqrt",
-                       name="tons/ha", na.value="grey90") +
-  labs(title="Beef yield (tons/ha)") +
+fig_cv_D_2024 <- grid_sf %>%
+  dplyr::filter(year==2024) %>%
+  ggplot() +
+  geom_sf(aes(fill=cv_D), color=NA) +
+  scale_fill_viridis_c(option="mako", direction=-1, limits=c(0,1),
+                       labels=scales::percent, name="") +
+  labs(title="Abandoned area (2024)") +
   theme_map
 
-# (5) yield_S_mb — soybean yield (area from mapbiomas)
-fig_yield_S_mb <- ggplot(grid_sf) +
-  geom_sf(aes(fill=yield_S_mb), color=NA) +
-  scale_fill_viridis_c(option="plasma", trans="sqrt",
-                       name="tons/ha", na.value="grey90") +
-  labs(title="Soybean yield (tons/ha, mb)") +
-  theme_map
+# Arrange plots
+( fig_cv_V_1985 | fig_cv_V_2024 ) /
+( fig_cv_I_1985 | fig_cv_I_2024 ) /
+( fig_cv_D_1985 | fig_cv_D_2024 )
 
-# (5) yield_S_pam — soybean yield (area from PAM)
-fig_yield_S_pam <- ggplot(grid_sf) +
-  geom_sf(aes(fill=yield_S_pam), color=NA) +
-  scale_fill_viridis_c(option="plasma", trans="sqrt",
-                       name="tons/ha", na.value="grey90") +
-  labs(title="Soybean yield (tons/ha, pam)") +
-  theme_map
+# save figures
+save_fig(fig_cv_V_1985, paste0("/cv_V_1985"))
+save_fig(fig_cv_V_2024, paste0("/cv_V_2024"))
+save_fig(fig_cv_I_1985, paste0("/cv_I_1985"))
+save_fig(fig_cv_I_2024, paste0("/cv_I_2024"))
+save_fig(fig_cv_D_1985, paste0("/cv_D_1985"))
+save_fig(fig_cv_D_2024, paste0("/cv_D_2024"))
 
-# (6) yield_S_fao — soybean yield (from FAO)
-fig_yield_S_fao <- ggplot(grid_sf) +
-  geom_sf(aes(fill=FAO_soy_yield), color=NA) +
-  scale_fill_viridis_c(option="plasma", trans="sqrt",
-                       name="tons/ha", na.value="grey90") +
-  labs(title="Soybean yield (tons/ha, fao)") +
-  theme_map
+# clean up
+rm(fig_cv_V_1985, fig_cv_V_2024,
+   fig_cv_I_1985, fig_cv_I_2024,
+   fig_cv_D_1985, fig_cv_D_2024)
 
-# (7) protected — binary protected area flag
+```
+
+## Protected areas
+
+```{r visualize_protected_area, echo=FALSE, fig.width=10, fig.height=8}
+# protected — binary protected area flag
 # two-color discrete scale: grey = unprotected, teal = protected
-fig_protected <- ggplot(grid_sf) +
+fig_protected <- grid_sf %>%
+  dplyr::filter(year==2024) %>%
+  ggplot() +
   geom_sf(aes(fill=factor(protected)), color=NA) +
   scale_fill_manual(values=c("0"="#d9d9d9", "1"="#009E73"),
                     labels=c("0"="No", "1"="Yes"),
@@ -185,31 +207,61 @@ fig_protected <- ggplot(grid_sf) +
   labs(title="Protected area") +
   theme_map
 
-# arrange in 2x3 grid
-(fig_cv_V | fig_cv_I | fig_cv_D) /
-(fig_yield_S_mb | fig_yield_S_pam | fig_yield_S_fao) /
-(fig_yield_C | fig_protected) #+
-  #patchwork::plot_layout(widths=c(1,1,1))
+fig_protected
 
-save_fig(fig_cv_V,        "spatial_fig_cv_V")
-save_fig(fig_cv_I,        "spatial_fig_cv_I")
-save_fig(fig_cv_D,        "spatial_fig_cv_D")
-save_fig(fig_yield_C,     "spatial_fig_yield_C")
-save_fig(fig_yield_S_mb,  "spatial_fig_yield_S_mb")
-save_fig(fig_yield_S_pam, "spatial_fig_yield_S_pam")
-save_fig(fig_yield_S_fao, "spatial_fig_yield_S_fao")
-save_fig(fig_protected,   "spatial_fig_protected")
+save_fig(fig_protected, paste0("/cv_public"))
 
-# clean up
-rm(grid_sf, grid_vars2, mun_codes_spatial,
-   theme_map, fig_cv_V, fig_cv_I, fig_cv_D,
-   fig_yield_C, fig_yield_S_mb, fig_yield_S_pam,
-   fig_yield_S_fao, fig_protected)
-
-rm(save_fig)
+rm(fig_protected)
 ```
 
 
+## Cattle and Soybean yield
+```{r visualize_grid_yield, echo=FALSE, fig.width=14, fig.height=14}
+
+# (1) theta_C
+fig_theta_C_1985 <- grid_sf %>%
+  dplyr::filter(year==1985) %>%
+  ggplot() +
+  geom_sf(aes(fill=theta_C), color=NA) +
+  scale_fill_viridis_c(option="plasma", trans="sqrt",
+                       name="tons/ha", na.value="grey90") +
+  labs(title="Beef yield (tons/ha, 1985)") +
+  theme_map
+
+fig_theta_C_1995 <- grid_sf %>%
+  dplyr::filter(year==1995) %>%
+  ggplot() +
+  geom_sf(aes(fill=theta_C), color=NA) +
+  scale_fill_viridis_c(option="plasma", trans="sqrt",
+                       name="tons/ha", na.value="grey90") +
+  labs(title="Beef yield (tons/ha, 1995)") +
+  theme_map
+
+# (2) theta_S
+fig_theta_S <- grid_sf %>%
+  dplyr::filter(year==1985) %>%
+  ggplot() +
+  geom_sf(aes(fill=theta_S), color=NA) +
+  scale_fill_viridis_c(option="plasma", trans="sqrt",
+                       name="tons/ha", na.value="grey90") +
+  labs(title="Soybean yield (tons/ha, 1981-2010)") +
+  theme_map
+
+# arrange grids
+(fig_theta_C_1985 | fig_theta_C_1995)
+
+fig_theta_S
+
+# save figures
+save_fig(fig_theta_C_1985, paste0("/cv_theta_C_1985"))
+save_fig(fig_theta_C_1995, paste0("/cv_theta_C_1995"))
+save_fig(fig_theta_S,      paste0("/cv_theta_S"))
+
+# clean up
+rm(fig_theta_C_1985, fig_theta_C_1995, fig_theta_S)
+rm(save_fig, theme_map, grid_sf)
+
+```
 
 <!--
 # Processing

@@ -13,7 +13,7 @@
 # (1) load grid and set output path ---------------------------------------
 terraOptions(progress = 1) # shows progress bar
 path_input_shp <- paste0("data_outputs/1_cell_grid/4_treat_grid/brazil_grid_tenure_",param_plot_km,"km.shp")
-grid_sf        <- sf::st_read(path_input_shp)
+grid_sf        <- sf::st_read(path_input_shp, quiet=TRUE)
 path_out_shp   <- paste0("data_outputs/1_cell_grid/5_grid_lulc/brazil_grid_lulc_",param_plot_km,"km.shp")
 
 # (2) define function to extract LULC statistics --------------------------
@@ -63,19 +63,23 @@ get_lulc_vars <- function(my_grid, year) {
   } # closes get_lulc_vars
 
 # (3) processes all years -------------------------------------------------
-# takes about 50 min per year
-years <- c("1985", "1995", "2006", "2017", "2024")
+## takes about 50 min per year
+#years <- c("1985", "1995", "2006", "2017", "2024") ########################################################################
+#
+#tic("Processing all years")
+#for (yr in years) {
+#  tic(paste0("Processing ",yr))
+#  grid_sf <- get_lulc_vars(grid_sf, year=yr)
+#  toc()
+#}
+#toc()
 
-tic("Processing all years")
-for (yr in years) {
-  tic(paste0("Processing ",yr))
-  grid_sf <- get_lulc_vars(grid_sf, year=yr)
-  toc()
-}
+tic("Processing 1985")
+grid_sf <- get_lulc_vars(grid_sf, year="1985")
 toc()
 
 # (4) saves output --------------------------------------------------------
 
-sf::st_write(grid_sf, path_out_shp, delete_layer=TRUE)
+sf::st_write(grid_sf, path_out_shp, delete_layer=TRUE, quiet=TRUE)
 
 rm(path_input_shp, path_out_shp, yr, years, get_lulc_vars)

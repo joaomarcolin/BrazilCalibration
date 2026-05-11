@@ -1,10 +1,10 @@
 # This script crops the cell grid and the yearly municipality-level of data
 # to an area of interest defined in script "export.R". It requires arguments
-# "param_plot_km", "set_subset_by", "set_aoi" and "set_name",
+# "param_plot_km", "set_subset_by", "set_aoi" and "aoi_name",
 # defined in script "export.R"
 
 # create the directory for storing the outputs
-path_output <- paste0("initialization/",set_name,"_",param_plot_km,"km")
+path_output <- paste0("initialization/",aoi_name,"_",param_plot_km,"km")
 if (!dir.exists("initialization")) dir.create("initialization")
 if (!dir.exists(path_output))      dir.create(path_output)
 
@@ -142,7 +142,7 @@ if (set_subset_by == "state") {
 }
 
 # (3.3) load shapefile and filter by area of interest
-grid_sf <- sf::st_read(path_sf) %>%
+grid_sf <- sf::st_read(path_sf, quiet=TRUE) %>%
   dplyr::filter(cell_id %in% df_grid$cell_id)
 
 # (3.4) only keep contiguous cells
@@ -223,9 +223,9 @@ df_census_aoi <- df_census_mun %>%
 rm(df_census_mun)
 
 # (6) save outputs --------------------------------------------------------
-readr::write_csv(df_census_aoi,    paste0(path_output,"/census_data_",set_name,".csv"))
-readr::write_csv(df_yearly_aoi,    paste0(path_output,"/yearly_data_",set_name,".csv"))
+readr::write_csv(df_census_aoi,    paste0(path_output,"/census_data_",aoi_name,".csv"))
+readr::write_csv(df_yearly_aoi,    paste0(path_output,"/yearly_data_",aoi_name,".csv"))
 readr::write_csv(df_yearly_prices, paste0(path_output,"/time_series.csv"))
-readr::write_csv(df_grid,          paste0(path_output,"/cell_data_",set_name,"_",param_plot_km,"km.csv"))
-sf::st_write(grid_sf,              paste0(path_output,"/cell_grid_",set_name,"_",param_plot_km,"km.shp"), delete_layer=TRUE)
+readr::write_csv(df_grid,          paste0(path_output,"/cell_data_",aoi_name,"_",param_plot_km,"km.csv"))
+sf::st_write(grid_sf,              paste0(path_output,"/cell_grid_",aoi_name,"_",param_plot_km,"km.shp"), delete_layer=TRUE, quiet=TRUE)
 rm(path_output)

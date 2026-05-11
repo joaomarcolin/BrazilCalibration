@@ -155,7 +155,7 @@ rm(biomes_sf, na_centroids, nearest, na_cells)
 
 # (6) save outputs --------------------------------------------------------
 path_out_shp    <- paste0("data_outputs/1_cell_grid/4_treat_grid/brazil_grid_tenure_",param_plot_km,"km.shp")
-sf::st_write(grid_sf, path_out_shp, delete_layer=TRUE)
+sf::st_write(grid_sf, path_out_shp, delete_layer=TRUE, quiet=TRUE)
 rm(grid_rast, grid_vec, path_out_shp)
 
 # (7) print summary statistics --------------------------------------------
